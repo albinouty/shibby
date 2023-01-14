@@ -1,71 +1,4 @@
 #!/usr/bin/env bash
-# hit POST https://sentry-read.svc.overdrive.com/chip (no bearer token)
-# in the payload, retrieve the identity value
-# get code from libby app
-# hit POST https://sentry-read.svc.overdrive.com/chip/clone/code using identity value as bearer token and the code from the app in the body
-# hit POST https://sentry-read.svc.overdrive.com/chip again, this time with the same bearer token
-# in the payload, the identity value has been updated (longer). Use this going forward as the bearer token
-# hit GET https://sentry-read.svc.overdrive.com/chip/sync with the bearer token (should return all of your stuff for your account)
-# to search for books, you will get sync to get the libraries the person is part of (could also just store these in a file somewhere)
-# then you append those library ids into the endpoint parameters
-# bearer token not needed
-#
-# SEARCH endpoint example GET -------------------V2
-# https://thunder.api.overdrive.com/v2/media/search?libraryKey=sno-isle&libraryKey=utahsonlinelibrary-hyrum&libraryKey=fortvancouver&libraryKey=slco&libraryKey=wccls&libraryKey=slcpl&libraryKey=aclibrary&query=the%20invisible%20man
-# this will return a bunch of stuff, importantly the ID of the book
-#
-# When looking at a specific book at a specific library GET https://thunder.api.overdrive.com/v2/libraries/sno-isle/media/3783573/availability -------------------V2
-# to get just general book information GET https://thunder.api.overdrive.com/v2/media/3783573 -------------------V2
-#
-# to check out a book, you need the card id (for the library where the book/format is available). This comes from the sync endpoint
-#
-# example POST to check out a book https://sentry-read.svc.overdrive.com/card/57709895/loan/3783573
-# example body (optional I think)
-#{
-#  "period": 21,
-#  "units": "days",
-#  "lucky_day": null,
-#  "title_format": "audiobook"
-#}
-#
-# once the book is checked out to your account, you want to query it to get some information (in order to download the media later)
-# GET https://sentry-read.svc.overdrive.com/open/audiobook/card/57709895/title/3783573 (bearer token needed)
-# the payload will have a message value and a urls.web value (it will also have an urls.openbook value which you will use later)
-#
-# send a GET to https://URL_WEB_VALUE/?m=MESSAGE_VALUE (gives you html, most importantly in the header of the response it gives you two set-cookie header values one 'd' and one '_sscl_d'
-#
-# send a GET to the openbook value (it's a url) from the previous payload. This requires the bearer and the cookie values you got previously were given
-#
-# To get the files, you query the web endpoint (ends in .listen.libbyapp.com/)
-# example is https://dewey-6fd550b5cdad92121bcf34640bc916bf.listen.libbyapp.com/%7B172C33E2-D0AA-45B6-B555-4A9FA118D8B0%7DFmt425-Part01.mp3?cmpt=eyJzcGluZSI6MH0%3D--375cfc595ea5eeb8285855b855efa47f15e2b3ed
-# note that %7B is '{' and %7D is '}'
-# the first part after %7B is from the GET you did on the openbook payload. In there is a 'spine' object with the various parts. The pieces you need are the 'path' for each part.
-# you then run a GET on the URL_VALUE/path value. This will give you the mp3. Be sure to send the bearer and the cookies
-# might need to be something you do in the code to actually download the mp3. But this endpoint provides the actual MP3
-#
-########################################
-###########       v1        ############
-########################################
-# login/auth with code
-# resync
-# list library cards
-# checkout book from specific library
-# download audiobook (location override or to a default Download location within script directory)
-# You must use the overdrive ui for your library to search for books and see if they are available
-# TODO verify again that you can get the book id from the overdrive ui
-
-########################################
-###########       v2        ############
-########################################
-# checkout book (first available library)
-# return book
-# library override
-# search
-# list my holds
-# list my loans
-# book info
-# argument to check if current token is still valid or not
-
 #       __   _ __   __
 #  ___ / /  (_) /  / /  __ __
 # (_-</ _ \/ / _ \/ _ \/ // /
@@ -359,7 +292,6 @@ function mainScript() {
     exit
   fi
 # TODO: Better error handling if the requests don't work
-echo -n
 
 ############### End Script Here ####################
 }

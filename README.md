@@ -31,6 +31,7 @@ I developed this script on a Mac, but I don't see any reason why it wouldn't run
 
 ## Usage/Examples
 To see everything shibby can do, simply pass in `-h` or `--help`
+
 ```shibby -h```
 
 Very first thing should be a `resync`. This is an important step and one that should be done again if you run into snags after using shibby for a while.
@@ -54,7 +55,7 @@ Library 1        123456
 Library 2        654321
 ```
 
-Next, because shibby is in its infancy, I don't have a way yet to use shibby to search for a book. **You will use your library's Overdrive website to search for the books you want**. Once you find it, click on the book and in the URL. The book ID you need to grab will be directly after `media/` in the URL. 
+Next, because shibby is in its infancy, I don't have a way yet to use shibby to search for a book. **You will use your library's Overdrive website to search for the books you want**. Once you find it, click on the book. Then look at the URL and the book ID you need to grab will be directly after `media/`. 
 
 For example, 
 - if the url is `www.libraryname.overdrive.com/media/4549230?c=2838`
@@ -77,7 +78,7 @@ For example,
 
  After running the command, you'll be prompted for the `Card Id` and the `Book Id`, just like when checking out a book. 
 
- shibby will then download the book to the location you have chosen. shibby will add /AUTHOR/BOOK_TITLE to the path and within the directory with the title's name will be the various mp3 files for the audiobook.
+ shibby will then download the book to the location you have chosen. shibby will add `/AUTHOR/BOOK_TITLE` to the path and within the directory with the title's name will be the various mp3 files for the audiobook.
 
 
 
@@ -107,6 +108,7 @@ No. The script was built with audiobooks in mind. Using this tool for ebooks is 
 
  - chbrown for the original Overdrive script which inspired me to make this one for Libby. [Check it out here.](https://github.com/chbrown/overdrive)
  - lillius for his version of a Libby app which I attempted to reverse engineer so I could make shibby in bash. [Check it out here.](https://github.com/lullius/pylibby)
+ - Nathaniel Landau for his cli boilerplate template which I used. [Check it out here.](https://natelandau.com/boilerplate-shell-script-template/)
 
 
 

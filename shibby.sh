@@ -24,6 +24,7 @@ syncPayload=""
 # These shared utilities provide many functions which are needed to provide
 # the functionality in this script
 #utilsLocation="${scriptPath}/lib/utils.sh" # Update this path to find the utilities.
+#TODO download the cover picture and put it in the download location with the mp3 files
 
 getToken() {
   local chipPayload
@@ -54,11 +55,7 @@ getIdentityPayload() {
   local arg1
   local identity
   arg1=$1
-  # first grep gets everything after 'identity' until a comma is found
-  # second grep grabs everything from the colon to the end of the string
-  # the sed removes the quotes
-  # TODO: Create the token file if the path is empty
-  identity=$(echo "$arg1" | grep -Eo '"identity"[^,]*' | grep -Eo '[^:]*$' | sed -e 's/^"//' -e 's/"$//')
+  identity=$(echo "$arg1" | jq -r '.identity')
   printf "$identity" > $TOKEN_PATH
 }
 

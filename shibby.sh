@@ -74,9 +74,19 @@ syncWithLibby() {
 }
 
 printLibraries() {
-  getSyncPayload
   echo "$syncPayload" | jq -r '"Library:CardId", "------:------", (.cards[] | .library.name + ":" + .cardId)' | column -s: -t
   #TODO: find a better way to generate a table with headers
+}
+
+checkIfValidCardId() {
+  local cardId=$1
+  local cards=$(echo "$syncPayload" | jq -r '[.cards[].cardId] | join(",")')
+  IFS=',' read -r -a cardArray <<< "$cards"
+  if [[ ! " ${cardArray[*]} " == *"$cardId"* ]]; then
+    echo "$cardId is not a card associated with your account. The cards you have are..."
+    printLibraries
+    exit
+  fi
 }
 
 getSyncPayload() {
@@ -91,6 +101,8 @@ getSyncPayload() {
 }
 
 checkout() {
+  # TODO, unable to checkout a book if it is available from a hold
+  # TODO, no error is thrown if the book does not check out
   local cardId
   local bookId
   local libraryName
@@ -100,9 +112,7 @@ checkout() {
   cardId=$1
   bookId=$2
   tokenValue=$(cat "$TOKEN_PATH")
-  getSyncPayload
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
-  # TODO throw an error if the cardId isn't recognized (pull the list of cards and compare it to the input)
   echo "Checking out book from $libraryName...."
   loanPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X POST -f -s $SVC_ENDPOINT"/card/$cardId/loan/$bookId")
   expireDate=$(echo "$loanPayload" | jq -r '.expireDate')
@@ -147,7 +157,6 @@ download() {
   cardId=$1
   bookId=$2
   tokenValue=$(cat "$TOKEN_PATH")
-  getSyncPayload
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
   # TODO throw an error if the cardId isn't recognized (pull the list of cards and compare it to the input)
   # TODO throw an error if the bookId isn't checked out at the library provided
@@ -232,6 +241,7 @@ debug=0
 ########################################
 function mainScript() {
   # TODO: add if statement for the checkout path
+  getSyncPayload
   if ! command -v jq &> /dev/null; then
     echo "jq could not be found. Please install jq by following the instructions here https://stedolan.github.io/jq/download/"
     exit
@@ -242,7 +252,7 @@ function mainScript() {
     local cardId
     local bookId
     setUpDownloadPath
-    echo "Enter Library Card: "; read -r cardId; echo "Enter Book Id: "; read -r bookId; echo
+    echo "Enter Library Card: "; read -r cardId; checkIfValidCardId "$cardId"; echo "Enter Book Id: "; read -r bookId; echo
     # TODO combine the library card entry between the download and checkout into a common function that sets a global var
     if [ "$cardId" != "" ] && [ "$bookId" != "" ]; then
       download "$cardId" "$bookId"
@@ -254,7 +264,7 @@ function mainScript() {
   if [ $checkoutBook == 1 ]; then
     local cardId
     local bookId
-    echo "Enter Library Card: "; read -r cardId; echo "Enter Book Id: "; read -r bookId; echo
+    echo "Enter Library Card: "; read -r cardId; checkIfValidCardId "$cardId"; echo "Enter Book Id: "; read -r bookId; echo
     if [ "$cardId" != "" ] && [ "$bookId" != "" ]; then
       checkout "$cardId" "$bookId"
     else echo "Both cardId and bookId must have a value"

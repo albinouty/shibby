@@ -1,3 +1,5 @@
 .idea
 /token.id
 .DS_Store
+playground.sh
+tmp.txt

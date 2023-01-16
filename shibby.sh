@@ -18,6 +18,7 @@ SSCL_COOKIE=""
 TOKEN_PATH="./token.id"
 syncPayload=""
 bookInfo=""
+SUPPORTED_FORMAT="audiobook"
 
 ########################################
 #######           UTIL           #######
@@ -118,9 +119,11 @@ checkout() {
   local expireDate
   cardId=$1
   bookId=$2
+  getBookInfo "$bookId"
+  bookName=$(echo "$bookInfo" | jq -r '.title')
   tokenValue=$(cat "$TOKEN_PATH")
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
-  echo "Checking out book from $libraryName...."
+  echo "Checking out $bookName from $libraryName...."
   loanPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X POST -f -s $SVC_ENDPOINT"/card/$cardId/loan/$bookId")
   expireDate=$(echo "$loanPayload" | jq -r '.expireDate')
   if [ -n "$expireDate" ]; then
@@ -149,7 +152,6 @@ setUpDownloadPath() {
 }
 
 download() {
-  # TODO, throw an error if the book id is not an audiobook
   local cardId
   local bookId
   local audiobookPayload
@@ -165,8 +167,16 @@ download() {
   bookId=$2
   tokenValue=$(cat "$TOKEN_PATH")
   getBookInfo "$bookId"
+  bookName=$(echo "$bookInfo" | jq -r '.title')
+  authorName=$(echo "$bookInfo" | jq -r '.firstCreatorName')
+#  libraryId=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .advantageKey')
+  media=$(echo "$bookInfo" | jq -r '.type.id')
+  if [ ! "$media" == "$SUPPORTED_FORMAT"  ]; then
+    echo "The bookId $bookId ($bookName) is not an audiobook and cannot be downloaded by shibby at this time..."
+    exit
+  fi
+  echo "Author is $authorName and book is $bookName"
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
-  # TODO throw an error if the cardId isn't recognized (pull the list of cards and compare it to the input)
   # TODO throw an error if the bookId isn't checked out at the library provided
   echo "Downloading the book from $libraryName...."
 
@@ -198,13 +208,13 @@ download() {
   openbookPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -H "Cookie: _sscl_d=$SSCL_COOKIE; d=$D_COOKIE" -X GET -f -s "$openbookUrl" )
 
   # get the author and book name without spaces to use in the directory path to the mp3 files
-  bookName=$(echo "$openbookPayload" | jq -r '.title.main' | tr -d ' ')
-  authorName=$(echo "$openbookPayload" | jq -r '.creator[] | select(.role == "author").name' | tr -d ' ')
+  bookNameNoSpaces=$(echo "$bookName" | tr -d ' ')
+  authorNameNoSpaces=$(echo "$authorName" | tr -d ' ')
 
   presentDirectory=$(pwd)
   cd "$DOWNLOAD_PATH"
-  mkdir -p ./"$authorName"/"$bookName"
-  cd "$authorName"/"$bookName"
+  mkdir -p ./"$authorNameNoSpaces"/"$bookNameNoSpaces"
+  cd "$authorNameNoSpaces"/"$bookNameNoSpaces"
   echo "Downloading cover"
   coverLocation=$(echo "$bookInfo" | jq -r '.covers.cover510Wide.href' | sed -e "s/{/%7B/" -e "s/}/%7D/")
   curl -o "cover.jpg" -f -s "$coverLocation"

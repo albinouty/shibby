@@ -17,6 +17,7 @@ D_COOKIE=""
 SSCL_COOKIE=""
 TOKEN_PATH="./token.id"
 syncPayload=""
+bookInfo=""
 
 ########################################
 #######           UTIL           #######
@@ -57,6 +58,12 @@ getIdentityPayload() {
   arg1=$1
   identity=$(echo "$arg1" | jq -r '.identity')
   printf "$identity" > $TOKEN_PATH
+}
+
+getBookInfo() {
+  local bookId
+  bookId=$1
+  bookInfo=$(curl -f -s -H "Accept: application/json" -X GET $THUNDER_ENDPOINT"/v2/media/$bookId")
 }
 
 syncWithLibby() {
@@ -157,6 +164,7 @@ download() {
   cardId=$1
   bookId=$2
   tokenValue=$(cat "$TOKEN_PATH")
+  getBookInfo "$bookId"
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
   # TODO throw an error if the cardId isn't recognized (pull the list of cards and compare it to the input)
   # TODO throw an error if the bookId isn't checked out at the library provided
@@ -197,6 +205,10 @@ download() {
   cd "$DOWNLOAD_PATH"
   mkdir -p ./"$authorName"/"$bookName"
   cd "$authorName"/"$bookName"
+  echo "Downloading cover"
+  coverLocation=$(echo "$bookInfo" | jq -r '.covers.cover510Wide.href' | sed -e "s/{/%7B/" -e "s/}/%7D/")
+  curl -o "cover.jpg" -f -s "$coverLocation"
+
   # parts to download will be in the spine.path objects. Store these in a file for looping over later.
   # TODO, could potentially avoid writing to the file and put these directly in an array but I ran into issues doing this
   local tmpPath="./tmpParts.txt"

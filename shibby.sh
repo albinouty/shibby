@@ -175,10 +175,9 @@ download() {
     echo "The bookId $bookId ($bookName) is not an audiobook and cannot be downloaded by shibby at this time..."
     exit
   fi
-  echo "Author is $authorName and book is $bookName"
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
   # TODO throw an error if the bookId isn't checked out at the library provided
-  echo "Downloading the book from $libraryName...."
+  echo "Downloading $bookName from $libraryName...."
 
   # retrieve message, urls.web and urls.openbook values
   audiobookPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X GET -f -s $SVC_ENDPOINT"/open/audiobook/card/$cardId/title/$bookId")

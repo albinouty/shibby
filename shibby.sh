@@ -129,8 +129,9 @@ checkout() {
   if [ -n "$expireDate" ]; then
     local titleAndAuthor
     titleAndAuthor=$(echo "$loanPayload" | jq -r '.title + " by " + .firstCreatorName')
-    echo "Successfully checked out $titleAndAuthor from $libraryName. It is due back on $expireDate"
-  # TODO make the date look better
+    # format the date for both macs and linux date functions. It'll pick whatever one can run.
+    formattedDate=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$expireDate" "+%A,%_d %B %Y at %r %Z" 2> /dev/null || date date -d "$expireDate" +'%A,%_d %B %Y at %r %Z' 2> /dev/null)
+    echo "Successfully checked out $titleAndAuthor from $libraryName. It is due back on $formattedDate"
   else
     echo "Something went wrong during checkout. Server responded with the following..."
     echo "$loanPayload"

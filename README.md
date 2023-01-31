@@ -29,20 +29,22 @@ Libraries all have their own Overdrive website where you can checkout ebooks and
 #### A way to run a shell script 
 I developed this script on a Mac, but I don't see any reason why it wouldn't run on Linux (I haven't tried it, though). I wouldn't even be surprised if this could run on Windows, provided you have the proper tools in place there to run bash scripts.
 
+## Setup
+Very first thing you do should be a `resync` or shibby won't work. This is an important step and one that should be done again if you run into snags after using shibby for a while.
+
+```sh ./shibby.sh -r```
+
+Once you have done that, it's time to authenticate shibby. Following the instructions in the Installation section, get the Libby authentication code and run this command:
+
+```sh ./shibby.sh -a 12345678```
+
 ## Usage/Examples
 To see everything shibby can do, simply pass in `-h` or `--help`
 
 ```shibby -h```
 
-Very first thing should be a `resync`. This is an important step and one that should be done again if you run into snags after using shibby for a while.
-
-```sh ./shibby.sh -r```
-
-Once you have done that, it's time to authenticate shibby. Following the instructions in the Installation section, get the Libby authentication code and run this command: 
-
-```sh ./shibby.sh -a 12345678```
-
-Now shibby is authenticated. You will need to get the unique card IDs Libby assigns to your various library cards. These don't change, but you may to list them out occasionally as you checkout and download various books. 
+### Viewing your libraries
+Many of the things shibby can do will require a library ID. shibby can show you the IDs that Libby assigns to your libraries. These don't change, but you may to list them out occasionally as you checkout and download various books. 
 
 ```sh ./shibby.sh --list```
 
@@ -55,7 +57,36 @@ Library 1        123456
 Library 2        654321
 ```
 
-Next, because shibby is in its infancy, I don't have a way yet to use shibby to search for a book. **You will use your library's Overdrive website to search for the books you want**. Once you find it, click on the book. Then look at the URL and the book ID you need to grab will be directly after `media/`. 
+### Searching
+**Option 1: Let shibby search for you!**
+
+You can search for books you want with shibby in your terminal prompt. Currently, shibby will only return audiobook results. To do this, simply run a command like the one below:
+
+`sh ./shibby.sh -s "moby dick"`
+
+Once you do that, you will be given some results that look like this: 
+```
+Searching your libraries for audiobooks returned by the query "moby dick"
+Showing results for 9 books...
+Title       Author            BookId   Publisher            Duration  Available Now  Holdable
+Moby Dick   Herman Melville   317297   Tantor Media, Inc.   25:29:38  library1:1234                                    
+Moby Dick   Herman Melville   150900   Books on Tape        24:34:14  library1:1234  library2:5678
+...
+...
+...
+```
+
+Scan through the results, and when you see a book you want, check which library it is at. The values in the `Available Now` and `Holdable` columns are your libraries. An example is `library1:1234`. The first part is an abbreviation of your library, the second part is the library ID that you will provide to the checkout (`-c`) and download (`-d`) commands.
+
+The `Available Now` column is libraries where the book is available for immediate checkout. The `Holdable` column means that library carries the book, but you have to place a hold for it as it is not currently available to checkout.
+
+You also will see the `BookId`. You can use this value to view the book directly in your browser if you want. Read on to the next section to learn about that.
+
+Finally, to complete the example, given the information above book `317297` is available immediately at library1 (id `1234`) and nowhere else. Book `150900` is available immediately at library1 (id `1234`) and a hold can be placed for it at library2 (id `5678`)
+
+**Option 2: Use your browser!**
+
+You can use your library's Overdrive website to search for the books you want. Once you find it, click on the book. Then look at the URL and the book ID you need to grab will be directly after `media/`. 
 
 For example, 
 - if the url is `www.libraryname.overdrive.com/media/4549230?c=2838`
@@ -64,12 +95,14 @@ For example,
   - the book ID in this case is `27324`
  You will need the book ID to checkout or download. 
 
+### Checking out a book
  You can checkout a book through shibby. To do this, run this command
  
  ```sh ./shibby.sh -c```
  
  You will then be prompted for the `Card ID` (you get this from the `--list` command) and the `Book Id` (you get this from the overdrive website).
 
+### Downloading a book
  Downloading a book is similar to checking one out. The book must first be checked out to you, then run this command: 
 
  ```sh ./shibby.sh -d file/path/where/you/want/it/to/download```

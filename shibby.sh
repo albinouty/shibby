@@ -12,7 +12,7 @@ version="1.0.0"
 scriptName="shibby"
 scriptPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SVC_ENDPOINT="https://sentry-read.svc.overdrive.com"
-THUNDER_ENDPOINT="https://thunder.api.overdrive.com"
+THUNDER_ENDPOINT="https://thunder.api.overdrive.com/v2"
 D_COOKIE=""
 SSCL_COOKIE=""
 TOKEN_PATH="./token.id"
@@ -64,7 +64,7 @@ getIdentityPayload() {
 getBookInfo() {
   local bookId
   bookId=$1
-  bookInfo=$(curl -f -s -H "Accept: application/json" -X GET $THUNDER_ENDPOINT"/v2/media/$bookId")
+  bookInfo=$(curl -f -s -H "Accept: application/json" -X GET $THUNDER_ENDPOINT"/media/$bookId")
 }
 
 syncWithLibby() {
@@ -84,6 +84,12 @@ syncWithLibby() {
 printLibraries() {
   echo "$syncPayload" | jq -r '"Library:CardId", "------:------", (.cards[] | .library.name + ":" + .cardId)' | column -s: -t
   #TODO: find a better way to generate a table with headers
+}
+
+libraryIdLookup() {
+  local library=$1
+  local id
+  id=$(echo "$syncPayload" | jq --arg foo "$library" -r '(.cards[] | select(.advantageKey==$foo)) | .cardId')
 }
 
 checkIfValidCardId() {
@@ -170,7 +176,6 @@ download() {
   getBookInfo "$bookId"
   bookName=$(echo "$bookInfo" | jq -r '.title')
   authorName=$(echo "$bookInfo" | jq -r '.firstCreatorName')
-#  libraryId=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .advantageKey')
   media=$(echo "$bookInfo" | jq -r '.type.id')
   if [ ! "$media" == "$SUPPORTED_FORMAT"  ]; then
     echo "The bookId $bookId ($bookName) is not an audiobook and cannot be downloaded by shibby at this time..."
@@ -245,6 +250,81 @@ download() {
   # TODO Provide a way for the user to determine where the download will go
 }
 
+searchForBook() {
+  getSyncPayload
+  local advantageKeys
+  local searchUri
+  local libraryParam
+  local booksReturned
+  local TMP_DIR=./shibbyTmp # directory to store book information. Deleted at beginning and end to clean it up should things go wrong.
+  local TMP_PAYLOAD=$TMP_DIR/searchPayload.txt
+  local TMP_INDV_BOOK=$TMP_DIR/individualBook.txt
+  rm -rf $TMP_DIR
+  formatCharacters="\r\n" # carriage return plus new line. Can use "echo -e" if the results look weird with this.
+  allResults="Title_Author_BookId_Publisher_Duration_Available Now_Holdable${formatCharacters}" # these are the headers for the results
+  searchString="${searchString// /%20}" # url encodes any spaces
+  libraryParam="&libraryKey="
+  advantageKeys=$(echo "$syncPayload" | jq -r '[.cards[].advantageKey] | join(",")')
+  iter=0
+  # construct query string with library keys  '?libraryKey=KEY_1&libraryKey=KEY_2&query=QUERY_INPUT'
+  for i in ${advantageKeys//,/ }
+  do
+    if [ $iter == 0 ]; then
+      searchUri="?libraryKey=$i"
+    else
+      searchUri="$searchUri""$libraryParam"$i
+    fi
+    ((iter=iter+1))
+  done
+  searchUri="$THUNDER_ENDPOINT"/media/search/"$searchUri"\&query="$searchString"
+  # hit search endpoint with library abbreviations and query string (https://thunder.api.overdrive.com/v2/media/search)
+  mkdir -p $TMP_DIR
+  curl -H "Accept: application/json" -X GET -f -s "$searchUri" | jq -r '[.[] | select(.type.id=="audiobook")]' > $TMP_PAYLOAD
+  # A strange issue was encountered here: running the script through sh is jacking up the json output from the search endpoint. It is breaking the data up into multiple lines.
+  # if you run it through ide, it seems to work fine. Not sure what the difference is
+  # an example of a problematic jq call is here "searchPayload=$(echo "$searchPayload" | jq -r '[.[] | select(.type.id=="audiobook")]')"
+  # LEARNING - For whatever reason, the json isn't split up at all if sh runs jq and it reads the json from a file. So for the complicated payloads like the book searches, I'll just store it in a file and read it from there.
+
+  # add logic here to limit the search to only audiobooks, maybe add a filter for language as well
+  booksReturned=$(jq -r 'length' $TMP_PAYLOAD)
+  echo "Showing results for $booksReturned books..."
+  x=0
+  # loop through each result to get specific details
+  while [ $x -le $(($booksReturned - 1 )) ]
+  do
+    jq --argjson idx "$x" -r '.[$idx]' $TMP_PAYLOAD > $TMP_INDV_BOOK
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration)' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
+    # get the patron's libraries that have this book as a comma separated list
+    availableLibraries=$(jq -r '.siteAvailabilities | keys | join(",")' $TMP_INDV_BOOK)
+    # now to get the availability of the various libraries, loop through the csv created earlier
+    local availableLocations=""
+    local holdableLocations=""
+    local isAvailable
+    local isHoldable
+    local id
+    # TODO is this needlessly expensive? Would be lovely not to have to do a subloop. I can't figure out a select statement in the jq to give me what I want though
+    for i in ${availableLibraries//,/ }
+    do
+      # get the unique library id for this library
+      id=$(echo "$syncPayload" | jq --arg foo "$i" -r '(.cards[] | select(.advantageKey==$foo)) | .cardId')
+      # check if library has it available
+      isAvailable=$(jq -e -r '.siteAvailabilities.'\"$i\"'.isAvailable|tostring' $TMP_INDV_BOOK) # need to escape the double quote for the case where the library location has a hyphen
+      isHoldable=$(jq -e -r '.siteAvailabilities.'\"$i\"'.isHoldable|tostring' $TMP_INDV_BOOK)
+      # if it does, assign it to the isAvailable var
+      if [[ $isAvailable == true ]]; then
+        availableLocations=${availableLocations}"$i:$id "
+      # if not, check if it is holdable, if so assign it to the isHoldable var
+      elif [[ $isHoldable == true ]]; then
+        holdableLocations=${holdableLocations}"$i:$id "
+      fi
+    done
+    x=$(( $x + 1 ))
+    allResults="${allResults}""${bookInfo}"_"${availableLocations}"_"${holdableLocations}""${formatCharacters}"
+  done
+  rm -rf $TMP_DIR
+  echo "$allResults" | column -s _ -t
+}
+
 ########################################
 #######          FLAGS           #######
 ########################################
@@ -257,6 +337,7 @@ list=0
 resync=0
 strict=0
 debug=0
+search=0
 
 ########################################
 #######           MAIN           #######
@@ -267,6 +348,17 @@ function mainScript() {
   if ! command -v jq &> /dev/null; then
     echo "jq could not be found. Please install jq by following the instructions here https://stedolan.github.io/jq/download/"
     exit
+  fi
+
+  if [ $search == 1 ]; then
+    local queryLength=${#searchString}
+    if [ -z "$searchString" ] || [ "$queryLength" -lt 2 ]; then
+      echo "ERROR: You must supply search string that is two or more characters"
+      exit
+    else
+      echo "Searching your libraries for audiobooks returned by the query \"$searchString\""
+      searchForBook
+    fi
   fi
 
   # downloading a book
@@ -315,10 +407,14 @@ function mainScript() {
 
   # if authorizing, we want to simply sync with the provided code, update our bearer token, and then exit as nothing else is needed.
   if [ $auth == 1 ]; then
-    echo "authorizing with code $authCode"
-    syncWithLibby "$authCode"
-    getSecondToken
-    exit
+    if [ -z "$authCode" ]; then
+      echo "ERROR: You must supply an authentication code retrieved from the Libby app. Example: shibby -a 12345678"
+    else
+      echo "authorizing with code $authCode"
+      syncWithLibby "$authCode"
+      getSecondToken
+      exit
+    fi
   fi
 # TODO: Better error handling if the requests don't work
 
@@ -331,14 +427,15 @@ function mainScript() {
 usage() {
   echo -n "${scriptName} [OPTION]...
  Options:
-  -a, --auth [AUTH CODE]  Login with numeric code generated from Libby app
-  -r, --resync            Start here! Force a new token retrieval (sometimes needed as previously provided tokens can expire)
-  -c, --checkout          Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
-  -d [PATH]               Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
-  --list                  Shows all your libraries and the respective card Ids
-  --debug                 Runs script in BASH debug mode (set -x)
-  -h, --help              Display this help and exit
-  --version               Output version information and exit
+  -r, --resync                  Start here! Force a new token retrieval (sometimes needed as previously provided tokens can expire)
+  -a, --auth [AUTH CODE]        Login with numeric code generated from Libby app
+  -s, --search [SEARCH STRING]  Searches all your libraries for books that match the search string
+  -c, --checkout                Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
+  -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
+  --list                        Shows all your libraries and the respective card Ids
+  --debug                       Runs script in BASH debug mode (set -x)
+  -h, --help                    Display this help and exit
+  --version                     Output version information and exit
 "
 }
 
@@ -387,6 +484,7 @@ while [[ $1 = -?* ]]; do
     -h|--help) usage >&2; exit ;;
     --version) echo "$(basename $0) ${version}"; exit ;;
     -r|--resync) resync=1 ;;
+    -s|--search) shift; searchString=${1}; search=1 ;;
     -a|--auth) shift; authCode=${1}; auth=1 ;;
     -c|--checkout) checkoutBook=1 ;;
     -d) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;

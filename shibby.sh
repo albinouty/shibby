@@ -318,6 +318,12 @@ searchForBook() {
       fi
     done
     x=$(( $x + 1 ))
+      if [[ $availableLocations == "" ]]; then
+        availableLocations="<<unavailable>>"
+      fi
+      if [[ $holdableLocations == "" ]]; then
+        holdableLocations="<<check it out instead!>>"
+      fi
     allResults="${allResults}""${bookInfo}"_"${availableLocations}"_"${holdableLocations}""${formatCharacters}"
   done
   rm -rf $TMP_DIR

@@ -79,6 +79,7 @@ syncWithLibby() {
   clonePayload=$(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $tokenValue" -d "$JSON" -X POST -f -s $SVC_ENDPOINT"/chip/clone/code" && echo "" || echo "Code sync didn't work")
   echo "$clonePayload"
 }
+#whatever
 
 printLibraries() {
   echo "$syncPayload" | jq -r '"Library:CardId:Libby Key", "---------:---------:---------", (.cards[] | .library.name + ":" + .cardId + ":" + .advantageKey)' | column -s: -t

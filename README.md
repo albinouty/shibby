@@ -44,17 +44,19 @@ To see everything shibby can do, simply pass in `-h` or `--help`
 ```shibby -h```
 
 ### Viewing your libraries
-Many of the things shibby can do will require a library ID. shibby can show you the IDs that Libby assigns to your libraries. These don't change, but you may to list them out occasionally as you checkout and download various books. 
+Many of the things shibby can do will require a library ID. shibby can show you the IDs that Libby assigns to your libraries. These don't change, but you may to list them out occasionally as you checkout and download various books. Also shown is the unique key assigned to the library by libby. This also doesn't change and will come in handy when determining which libraries have books you want when searching.
 
 ```sh ./shibby.sh --list```
 
 You will be given an output that looks like this: 
 
 ```
-Library          CardId
-------           ------
-Library 1        123456
-Library 2        654321
+Library                          CardId       Libby Key    
+---------                        ---------    ---------
+Boston Public Library            123456       bpl                      
+San Fransico Public Library      654321       sfpl                     
+Fulton County Library System     98765        fulcolibrary             
+Salt Lake City Public Library    123456789    slcpl                    
 ```
 
 ### Searching
@@ -127,7 +129,6 @@ No. The script was built with audiobooks in mind. Using this tool for ebooks is 
 
 #### What features are you planning on adding in the future?
 
-- Search for a book
 - Get more info about a specific book
 - View loans
 - View/place holds

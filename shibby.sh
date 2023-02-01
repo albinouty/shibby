@@ -26,7 +26,6 @@ SUPPORTED_FORMAT="audiobook"
 # These shared utilities provide many functions which are needed to provide
 # the functionality in this script
 #utilsLocation="${scriptPath}/lib/utils.sh" # Update this path to find the utilities.
-#TODO download the cover picture and put it in the download location with the mp3 files
 
 getToken() {
   local chipPayload
@@ -82,7 +81,7 @@ syncWithLibby() {
 }
 
 printLibraries() {
-  echo "$syncPayload" | jq -r '"Library:CardId", "------:------", (.cards[] | .library.name + ":" + .cardId)' | column -s: -t
+  echo "$syncPayload" | jq -r '"Library:CardId:Libby Key", "---------:---------:---------", (.cards[] | .library.name + ":" + .cardId + ":" + .advantageKey)' | column -s: -t
   #TODO: find a better way to generate a table with headers
 }
 
@@ -247,7 +246,6 @@ download() {
   # move back to our original directory
   cd "$presentDirectory"
   # TODO Failure message if the download didn't work
-  # TODO Provide a way for the user to determine where the download will go
 }
 
 searchForBook() {
@@ -293,7 +291,7 @@ searchForBook() {
   while [ $x -le $(($booksReturned - 1 )) ]
   do
     jq --argjson idx "$x" -r '.[$idx]' $TMP_PAYLOAD > $TMP_INDV_BOOK
-    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration)' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
     # get the patron's libraries that have this book as a comma separated list
     availableLibraries=$(jq -r '.siteAvailabilities | keys | join(",")' $TMP_INDV_BOOK)
     # now to get the availability of the various libraries, loop through the csv created earlier

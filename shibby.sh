@@ -182,6 +182,12 @@ download() {
     exit
   fi
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
+  cardThatOwnsBook=$(echo "$syncPayload" | jq --arg foo "$bookId" -r '.loans[] | select(.id==$foo) | .cardId')
+  # check if book is checked out at this library
+  if [ ! "$cardId" == "$cardThatOwnsBook" ]; then
+    echo "ERROR: The book \"$bookName\" is not checked out at $libraryName ($cardId). Exiting..."
+    exit
+  fi
   # TODO throw an error if the bookId isn't checked out at the library provided
   echo "Downloading $bookName from $libraryName...."
 

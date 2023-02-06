@@ -13,12 +13,18 @@ scriptName="shibby"
 scriptPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SVC_ENDPOINT="https://sentry-read.svc.overdrive.com"
 THUNDER_ENDPOINT="https://thunder.api.overdrive.com/v2"
+OVERDRIVE_DATE_FORMAT="%Y-%m-%dT%H:%M:%SZ"
+SHIBBY_DATE_FORMAT="+%A, %_d %B %Y at %r %Z"
 D_COOKIE=""
 SSCL_COOKIE=""
 TOKEN_PATH="./token.id"
 syncPayload=""
 bookInfo=""
 SUPPORTED_FORMAT="audiobook"
+TMP_DIR=./shibbyTmp # directory to store tmp information. Deleted at beginning and end of certain calls should things go wrong.
+listLength=0
+formatCharacters="\r\n" # carriage return plus new line. Can use "echo -e" if the results look weird with this.
+formattedDate=""
 
 ########################################
 #######           UTIL           #######
@@ -79,7 +85,6 @@ syncWithLibby() {
   clonePayload=$(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $tokenValue" -d "$JSON" -X POST -f -s $SVC_ENDPOINT"/chip/clone/code" && echo "" || echo "Code sync didn't work")
   echo "$clonePayload"
 }
-#whatever
 
 printLibraries() {
   echo "$syncPayload" | jq -r '"Library:CardId:Libby Key", "---------:---------:---------", (.cards[] | .library.name + ":" + .cardId + ":" + .advantageKey)' | column -s: -t
@@ -114,6 +119,12 @@ getSyncPayload() {
   fi
 }
 
+formatDate() {
+# date passed in must be in the format of OVERDRIVE_DATE_FORMAT or this will not work
+  theDate=$1
+  formattedDate=$(date -jf "$OVERDRIVE_DATE_FORMAT" "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null || date date -d "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null)
+}
+
 checkout() {
   # TODO, unable to checkout a book if it is available from a hold
   # TODO, no error is thrown if the book does not check out
@@ -136,7 +147,7 @@ checkout() {
     local titleAndAuthor
     titleAndAuthor=$(echo "$loanPayload" | jq -r '.title + " by " + .firstCreatorName')
     # format the date for both macs and linux date functions. It'll pick whatever one can run.
-    formattedDate=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$expireDate" "+%A,%_d %B %Y at %r %Z" 2> /dev/null || date date -d "$expireDate" +'%A,%_d %B %Y at %r %Z' 2> /dev/null)
+    formatDate $expireDate
     echo "Successfully checked out $titleAndAuthor from $libraryName. It is due back on $formattedDate"
   else
     echo "Something went wrong during checkout. Server responded with the following..."
@@ -255,17 +266,45 @@ download() {
   # TODO Failure message if the download didn't work
 }
 
+getListLength() {
+  local path
+  path=$1
+  listLength=$(jq -r 'length' $path)
+  echo "Found $listLength books..."
+}
+
+printLoans() {
+  local TMP_LOANS=$TMP_DIR/loans.txt
+  local TMP_INDV_LOAN=$TMP_DIR/individualLoan.txt
+  local allResults="Title_Author_BookId_Publisher_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
+  mkdir -p $TMP_DIR
+  getSyncPayload
+  echo "$syncPayload" | jq -r '[.loans[] | select(.type.id=="audiobook")]' > $TMP_LOANS
+  getListLength $TMP_LOANS
+  x=0
+  while [ $x -le $(($listLength - 1 )) ]
+  do
+    jq --argjson idx "$x" -r '.[$idx]' $TMP_LOANS > $TMP_INDV_LOAN
+    card=$(jq -r '.cardId' $TMP_INDV_LOAN)
+    libraryName=$(echo "$syncPayload" | jq --arg foo "$card" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
+    libraryName="$libraryName / $card"
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisherAccount.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_LOAN)
+    expirationDate=$(jq -r '.expireDate' $TMP_INDV_LOAN)
+    formatDate $expirationDate
+    x=$(( $x + 1 ))
+    allResults="${allResults}""${bookInfo}"_"${libraryName}"_"${formattedDate}""${formatCharacters}"
+  done
+  echo "$allResults" | column -s _ -t
+  rm -rf $TMP_DIR
+}
+
 searchForBook() {
   getSyncPayload
   local advantageKeys
   local searchUri
   local libraryParam
-  local booksReturned
-  local TMP_DIR=./shibbyTmp # directory to store book information. Deleted at beginning and end to clean it up should things go wrong.
   local TMP_PAYLOAD=$TMP_DIR/searchPayload.txt
   local TMP_INDV_BOOK=$TMP_DIR/individualBook.txt
-  rm -rf $TMP_DIR
-  formatCharacters="\r\n" # carriage return plus new line. Can use "echo -e" if the results look weird with this.
   allResults="Title_Author_BookId_Publisher_Duration_Available Now_Holdable${formatCharacters}" # these are the headers for the results
   searchString="${searchString// /%20}" # url encodes any spaces
   libraryParam="&libraryKey="
@@ -289,15 +328,13 @@ searchForBook() {
   # if you run it through ide, it seems to work fine. Not sure what the difference is
   # an example of a problematic jq call is here "searchPayload=$(echo "$searchPayload" | jq -r '[.[] | select(.type.id=="audiobook")]')"
   # LEARNING - For whatever reason, the json isn't split up at all if sh runs jq and it reads the json from a file. So for the complicated payloads like the book searches, I'll just store it in a file and read it from there.
-
-  # add logic here to limit the search to only audiobooks, maybe add a filter for language as well
-  booksReturned=$(jq -r 'length' $TMP_PAYLOAD)
-  echo "Showing results for $booksReturned books..."
-  x=0
+  getListLength $TMP_PAYLOAD
   # loop through each result to get specific details
-  while [ $x -le $(($booksReturned - 1 )) ]
+  x=0
+  while [ $x -le $(($listLength - 1 )) ]
   do
     jq --argjson idx "$x" -r '.[$idx]' $TMP_PAYLOAD > $TMP_INDV_BOOK
+    # can't reuse this bookInfo for other similar things (like for loans or holds) because some of fields and properties are slightly different
     bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
     # get the patron's libraries that have this book as a comma separated list
     availableLibraries=$(jq -r '.siteAvailabilities | keys | join(",")' $TMP_INDV_BOOK)
@@ -349,11 +386,13 @@ resync=0
 strict=0
 debug=0
 search=0
+loans=0
 
 ########################################
 #######           MAIN           #######
 ########################################
 function mainScript() {
+  rm -rf $TMP_DIR
   # TODO: add if statement for the checkout path
   getSyncPayload
   if ! command -v jq &> /dev/null; then
@@ -370,6 +409,12 @@ function mainScript() {
       echo "Searching your libraries for audiobooks returned by the query \"$searchString\""
       searchForBook
     fi
+  fi
+
+  #viewing loans
+  if [ $loans == 1 ]; then
+   printLoans
+   exit
   fi
 
   # downloading a book
@@ -444,6 +489,7 @@ usage() {
   -c, --checkout                Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
   -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
   --list                        Shows all your libraries and the respective card Ids
+  --loans                       Shows all the current loans you have at your libraries
   --debug                       Runs script in BASH debug mode (set -x)
   -h, --help                    Display this help and exit
   --version                     Output version information and exit
@@ -499,6 +545,7 @@ while [[ $1 = -?* ]]; do
     -a|--auth) shift; authCode=${1}; auth=1 ;;
     -c|--checkout) checkoutBook=1 ;;
     -d) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
+    --loans) loans=1 ;;
     --list) list=1 ;;
     --debug) debug=1 ;;
     --endopts) shift; break ;;

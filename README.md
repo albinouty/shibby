@@ -43,6 +43,21 @@ To see everything shibby can do, simply pass in `-h` or `--help`
 
 ```shibby -h```
 
+```
+-n shibby [OPTION]...
+ Options:
+  -r, --resync                  Start here! Force a new token retrieval (sometimes needed as previously provided tokens can expire)
+  -a, --auth [AUTH CODE]        Login with numeric code generated from Libby app
+  -s, --search [SEARCH STRING]  Searches all your libraries for books that match the search string
+  -c, --checkout                Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
+  -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
+  --list                        Shows all your libraries and the respective card Ids
+  --loans                       Shows all the current loans you have at your libraries
+  --debug                       Runs script in BASH debug mode (set -x)
+  -h, --help                    Display this help and exit
+  --version                     Output version information and exit
+```
+
 ### Viewing your libraries
 Many of the things shibby can do will require a library ID. shibby can show you the IDs that Libby assigns to your libraries. These don't change, but you may to list them out occasionally as you checkout and download various books. Also shown is the unique key assigned to the library by libby. This also doesn't change and will come in handy when determining which libraries have books you want when searching.
 
@@ -69,7 +84,7 @@ You can search for books you want with shibby in your terminal prompt. Currently
 Once you do that, you will be given some results that look like this: 
 ```
 Searching your libraries for audiobooks returned by the query "moby dick"
-Showing results for 9 books...
+9 books returned...
 Title       Author            BookId   Publisher            Duration  Available Now  Holdable
 Moby Dick   Herman Melville   317297   Tantor Media, Inc.   25:29:38  library1:1234                                    
 Moby Dick   Herman Melville   150900   Books on Tape        24:34:14  library1:1234  library2:5678
@@ -103,6 +118,20 @@ For example,
  ```sh ./shibby.sh -c```
  
  You will then be prompted for the `Card ID` (you get this from the `--list` command) and the `Book Id` (you get this from the overdrive website).
+
+### Viewing your loans
+ Shibby will show you which books you have checked out currently. 
+
+ `sh ./shibby.sh --loans`
+
+ ```
+Found 4 books...
+Title                               Author            BookId   Publisher               Duration  Library / Id                                         Due Date
+The Mountain Between Us             Charles Martin    206800   Books on Tape           09:56:51  Boston Public Library / 123456                       Tuesday, 14 February 2023 at 09:46:49 PM MST
+The Adventures of Huckleberry Finn  Mark Twain        61470    Blackstone Audio, Inc.  09:22:36  Fort Vancouver Regional Library District / 54998822  Monday, 27 February 2023 at 04:53:06 AM MST
+Nasty, Brutish, and Short           Scott Hershovitz  6491010  Books on Tape           09:31:20  Fort Vancouver Regional Library District / 54998822  Sunday, 26 February 2023 at 12:31:41 AM MST
+Finlay Donovan Jumps the Gun        Elle Cosimano     8916746  Macmillan Audio         08:38:50  San Fransico Public Library / 9876543                Tuesday, 21 February 2023 at 09:21:53 PM MST
+ ```
 
 ### Downloading a book
  Downloading a book is similar to checking one out. The book must first be checked out to you, then run this command: 

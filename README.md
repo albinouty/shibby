@@ -119,19 +119,28 @@ For example,
  
  You will then be prompted for the `Card ID` (you get this from the `--list` command) and the `Book Id` (you get this from the overdrive website).
 
-### Viewing your loans
- Shibby will show you which books you have checked out currently. 
+### Viewing your loans and holds
+ Shibby will show you which books you have checked out currently and also which books you have holds for.
 
  `sh ./shibby.sh --loans`
 
  ```
 Found 4 books...
 Title                               Author            BookId   Publisher               Duration  Library / Id                                         Due Date
-The Mountain Between Us             Charles Martin    206800   Books on Tape           09:56:51  Boston Public Library / 123456                       Tuesday, 14 February 2023 at 09:46:49 PM MST
-The Adventures of Huckleberry Finn  Mark Twain        61470    Blackstone Audio, Inc.  09:22:36  Fort Vancouver Regional Library District / 54998822  Monday, 27 February 2023 at 04:53:06 AM MST
-Nasty, Brutish, and Short           Scott Hershovitz  6491010  Books on Tape           09:31:20  Fort Vancouver Regional Library District / 54998822  Sunday, 26 February 2023 at 12:31:41 AM MST
-Finlay Donovan Jumps the Gun        Elle Cosimano     8916746  Macmillan Audio         08:38:50  San Fransico Public Library / 9876543                Tuesday, 21 February 2023 at 09:21:53 PM MST
+The Mountain Between Us             Charles Martin    206800   Books on Tape           09:56:51  Boston Public Library / 123456                       Tuesday, 14 February 2023
+The Adventures of Huckleberry Finn  Mark Twain        61470    Blackstone Audio, Inc.  09:22:36  Fort Vancouver Regional Library District / 44553334  Monday, 27 February 2023
+Nasty, Brutish, and Short           Scott Hershovitz  6491010  Books on Tape           09:31:20  Fort Vancouver Regional Library District / 44553334  Sunday, 26 February 2023
+Finlay Donovan Jumps the Gun        Elle Cosimano     8916746  Macmillan Audio         08:38:50  San Fransico Public Library / 9876543                Tuesday, 21 February 2023
  ```
+
+`sh ./shibby.sh --holds`
+
+ ```
+Found 2 books...
+Title                                  Author          BookId   Duration      Hold Position  Estimated Wait (Days)  Library / Id                           Hold Placed On
+Finlay Donovan Is Killing It--A Novel  Elle Cosimano   5462436  09:59:50      310 of 438     638                    Beehive Library Consortium / 1234  Monday, 23 January 2023
+Mrs. Harris Goes to Paris / Mrs. Har   Paul Gallico    9216126  10:16:14      30 of 81       140                    Beehive Library Consortium / 1234  Sunday,  4 December 2022 
+```
 
 ### Downloading a book
  Downloading a book is similar to checking one out. The book must first be checked out to you, then run this command: 

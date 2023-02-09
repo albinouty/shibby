@@ -13,8 +13,8 @@ scriptName="shibby"
 scriptPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SVC_ENDPOINT="https://sentry-read.svc.overdrive.com"
 THUNDER_ENDPOINT="https://thunder.api.overdrive.com/v2"
-OVERDRIVE_DATE_FORMAT="%Y-%m-%dT%H:%M:%SZ"
-SHIBBY_DATE_FORMAT="+%A, %_d %B %Y at %r %Z"
+OVERDRIVE_DATE_FORMAT="%Y-%m-%dT%H:%M:%SZ" #unfortunately not all dates in their APIs conform to this
+SHIBBY_DATE_FORMAT="+%A, %_d %B %Y" # could add at %r %Z to the end of this to get the time of day. I think it takes up too much console space though
 D_COOKIE=""
 SSCL_COOKIE=""
 TOKEN_PATH="./token.id"
@@ -120,9 +120,10 @@ getSyncPayload() {
 }
 
 formatDate() {
-# date passed in must be in the format of OVERDRIVE_DATE_FORMAT or this will not work
   theDate=$1
-  formattedDate=$(date -jf "$OVERDRIVE_DATE_FORMAT" "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null || date date -d "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null)
+  theFormat=$2
+  # format the date for both macs and linux date functions. It'll pick whatever one can run.
+  formattedDate=$(date -jf "$theFormat" "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null || date -d "$theDate" "$SHIBBY_DATE_FORMAT" 2> /dev/null)
 }
 
 checkout() {
@@ -146,8 +147,7 @@ checkout() {
   if [ -n "$expireDate" ]; then
     local titleAndAuthor
     titleAndAuthor=$(echo "$loanPayload" | jq -r '.title + " by " + .firstCreatorName')
-    # format the date for both macs and linux date functions. It'll pick whatever one can run.
-    formatDate $expireDate
+    formatDate $expireDate $OVERDRIVE_DATE_FORMAT
     echo "Successfully checked out $titleAndAuthor from $libraryName. It is due back on $formattedDate"
   else
     echo "Something went wrong during checkout. Server responded with the following..."
@@ -196,7 +196,8 @@ download() {
   cardThatOwnsBook=$(echo "$syncPayload" | jq --arg foo "$bookId" -r '.loans[] | select(.id==$foo) | .cardId')
   # check if book is checked out at this library
   if [ ! "$cardId" == "$cardThatOwnsBook" ]; then
-    echo "ERROR: The book \"$bookName\" is not checked out at $libraryName ($cardId). Exiting..."
+    echo "ERROR: The book \"$bookName\" is not checked out at $libraryName ($cardId). Your current loans are:"
+    printLoans
     exit
   fi
   # TODO throw an error if the bookId isn't checked out at the library provided
@@ -276,7 +277,7 @@ getListLength() {
 printLoans() {
   local TMP_LOANS=$TMP_DIR/loans.txt
   local TMP_INDV_LOAN=$TMP_DIR/individualLoan.txt
-  local allResults="Title_Author_BookId_Publisher_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
+  local allResults="Title_Author_BookId_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
   mkdir -p $TMP_DIR
   getSyncPayload
   echo "$syncPayload" | jq -r '[.loans[] | select(.type.id=="audiobook")]' > $TMP_LOANS
@@ -288,9 +289,34 @@ printLoans() {
     card=$(jq -r '.cardId' $TMP_INDV_LOAN)
     libraryName=$(echo "$syncPayload" | jq --arg foo "$card" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
     libraryName="$libraryName / $card"
-    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisherAccount.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_LOAN)
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_LOAN)
     expirationDate=$(jq -r '.expireDate' $TMP_INDV_LOAN)
-    formatDate $expirationDate
+    formatDate $expirationDate $OVERDRIVE_DATE_FORMAT
+    x=$(( $x + 1 ))
+    allResults="${allResults}""${bookInfo}"_"${libraryName}"_"${formattedDate}""${formatCharacters}"
+  done
+  echo "$allResults" | column -s _ -t
+  rm -rf $TMP_DIR
+}
+
+printHolds() {
+  local TMP_HOLDS=$TMP_DIR/holds.txt
+  local TMP_INDV_HOLD=$TMP_DIR/individualhold.txt
+  local allResults="Title_Author_BookId_Duration_Hold Position_Estimated Wait (Days)_Library / Id_Hold Placed On${formatCharacters}" # these are the headers for the holds
+  mkdir -p $TMP_DIR
+  getSyncPayload
+  echo "$syncPayload" | jq -r '[.holds[] | select(.type.id=="audiobook")]' > $TMP_HOLDS
+  getListLength $TMP_HOLDS
+  x=0
+  while [ $x -le $(($listLength - 1 )) ]
+  do
+    jq --argjson idx "$x" -r '.[$idx]' $TMP_HOLDS > $TMP_INDV_HOLD
+    card=$(jq -r '.cardId' $TMP_INDV_HOLD)
+    libraryName=$(echo "$syncPayload" | jq --arg foo "$card" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
+    libraryName="$libraryName / $card"
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + (.formats[0].duration // "Not Provided") + "_" + (.holdListPosition | tostring) + " of " + (.holdsCount | tostring) + "_" + (.estimatedWaitDays // "Not Provided" | tostring)' $TMP_INDV_HOLD)
+    placedDate=$(jq -r '.placedDate' $TMP_INDV_HOLD)
+    formatDate $placedDate "%Y-%m-%dT%H:%M:%S" # this date comes through with milliseconds, thus we aren't putting the Z at the end and the command should ignore the extra characters
     x=$(( $x + 1 ))
     allResults="${allResults}""${bookInfo}"_"${libraryName}"_"${formattedDate}""${formatCharacters}"
   done
@@ -387,6 +413,7 @@ strict=0
 debug=0
 search=0
 loans=0
+holds=0
 
 ########################################
 #######           MAIN           #######
@@ -414,6 +441,12 @@ function mainScript() {
   #viewing loans
   if [ $loans == 1 ]; then
    printLoans
+   exit
+  fi
+
+  #viewing holds
+  if [ $holds == 1 ]; then
+   printHolds
    exit
   fi
 
@@ -490,6 +523,7 @@ usage() {
   -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
   --list                        Shows all your libraries and the respective card Ids
   --loans                       Shows all the current loans you have at your libraries
+  --holds                       Shows all the current holds you have at your libraries
   --debug                       Runs script in BASH debug mode (set -x)
   -h, --help                    Display this help and exit
   --version                     Output version information and exit
@@ -546,6 +580,7 @@ while [[ $1 = -?* ]]; do
     -c|--checkout) checkoutBook=1 ;;
     -d) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
     --loans) loans=1 ;;
+    --holds) holds=1 ;;
     --list) list=1 ;;
     --debug) debug=1 ;;
     --endopts) shift; break ;;

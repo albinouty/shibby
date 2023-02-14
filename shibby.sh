@@ -25,6 +25,8 @@ TMP_DIR=./shibbyTmp # directory to store tmp information. Deleted at beginning a
 listLength=0
 formatCharacters="\r\n" # carriage return plus new line. Can use "echo -e" if the results look weird with this.
 formattedDate=""
+_LIBRARY="" # used to hold the context library passed in for certain commands
+_BOOK="" # used to hold the context book id passed in for certain commands
 
 ########################################
 #######           UTIL           #######
@@ -158,8 +160,10 @@ checkout() {
 setUpDownloadPath() {
   # if the download path option isn't provided, set a default location
   if [ -z "$DOWNLOAD_PATH" ]; then
-    echo "No download path provided -- will save the audiobook to ~/audiobooks"
+    echo "No download path provided, will save the audiobook to ~/audiobooks"
     DOWNLOAD_PATH="$HOME/audiobooks"
+  else
+    echo "Downloading the book to the directory $DOWNLOAD_PATH"
   fi
 
   # if the mkdir command fails, return an error
@@ -169,6 +173,8 @@ setUpDownloadPath() {
   fi
 }
 
+# PROBLEM - when passing in the download location, everything works.DOWNLOAD_PATH
+# If the download location isn't passed in, everything breaks because the subsequent commands don't work
 download() {
   local cardId
   local bookId
@@ -452,25 +458,24 @@ function mainScript() {
 
   # downloading a book
   if [ $downloadBook == 1 ]; then
-    local cardId
-    local bookId
     setUpDownloadPath
-    echo "Enter Library Card: "; read -r cardId; checkIfValidCardId "$cardId"; echo "Enter Book Id: "; read -r bookId; echo
-    # TODO combine the library card entry between the download and checkout into a common function that sets a global var
-    if [ "$cardId" != "" ] && [ "$bookId" != "" ]; then
-      download "$cardId" "$bookId"
-    else echo "Both cardId and bookId must have a value"
+    if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      download "$_LIBRARY" "$_BOOK"
+    else
+      echo "ERROR: You must pass in both a library (--lib) and a book id (-b or --book) with this command"
+      usage
+      exit
     fi
   fi
 
   # checking out a book
   if [ $checkoutBook == 1 ]; then
-    local cardId
-    local bookId
-    echo "Enter Library Card: "; read -r cardId; checkIfValidCardId "$cardId"; echo "Enter Book Id: "; read -r bookId; echo
-    if [ "$cardId" != "" ] && [ "$bookId" != "" ]; then
-      checkout "$cardId" "$bookId"
-    else echo "Both cardId and bookId must have a value"
+    if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      checkout "$_LIBRARY" "$_BOOK"
+    else
+      echo "ERROR: You must pass in both a library (--lib) and a book id (-b or --book) with this command"
+      usage
+      exit
     fi
   fi
 
@@ -514,19 +519,42 @@ function mainScript() {
 #######        HELP TEXT         #######
 ########################################
 usage() {
-  echo -n "${scriptName} [OPTION]...
- Options:
-  -r, --resync                  Start here! Force a new token retrieval (sometimes needed as previously provided tokens can expire)
-  -a, --auth [AUTH CODE]        Login with numeric code generated from Libby app
-  -s, --search [SEARCH STRING]  Searches all your libraries for books that match the search string
-  -c, --checkout                Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
-  -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
-  --list                        Shows all your libraries and the respective card Ids
-  --loans                       Shows all the current loans you have at your libraries
-  --holds                       Shows all the current holds you have at your libraries
-  --debug                       Runs script in BASH debug mode (set -x)
-  -h, --help                    Display this help and exit
-  --version                     Output version information and exit
+  echo "Options:
+  -r, --resync
+        Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
+
+  -a, --auth [AUTH CODE]
+        Login with numeric code generated from Libby app
+
+  -s, --search [SEARCH STRING]
+        Searches all your libraries for books that match the search string
+
+  -c, --checkout --lib [libraryId] --book [bookId]
+        Checkout a book. You must also pass in --lib which is the library id (use the --list command to see these) -b | --book which is the book id (get this from the overdrive website URL)
+
+  -d, --lib [libraryId] --book [bookId]
+        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id to download from as well as the book id.
+
+  --download=/your/custom/path --lib [libraryId] --book [bookId]
+        Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
+
+  --list
+        Shows all your libraries and the respective card Ids
+
+  --loans
+        Shows all the current loans you have at your libraries
+
+  --holds
+        Shows all the current holds you have at your libraries
+
+  --debug
+        Runs script in BASH debug mode (set -x)
+
+  -h, --help
+        Display this help and exit
+
+  --version
+        Output version information and exit
 "
 }
 
@@ -578,7 +606,10 @@ while [[ $1 = -?* ]]; do
     -s|--search) shift; searchString=${1}; search=1 ;;
     -a|--auth) shift; authCode=${1}; auth=1 ;;
     -c|--checkout) checkoutBook=1 ;;
-    -d) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
+    -d) downloadBook=1 ;;
+    --download) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
+    --lib) shift; _LIBRARY=${1} ;;
+    -b|--book) shift; _BOOK=${1} ;;
     --loans) loans=1 ;;
     --holds) holds=1 ;;
     --list) list=1 ;;

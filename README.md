@@ -1,10 +1,9 @@
-
 # shibby
 
 shibby is a shell script for Libby (get it? sh-ibby...you get it). With the move to Libby, the mp3 files for audiobooks are no longer easily accessible like they once were directly through Overdrive. This tool gives you access to those files again...
 
 ## Installation
-Because shibby is a bash script, it doesn't requier much in terms of installation. Just download it and run it (assuming you have `jq`, read more below).
+Because shibby is a bash script, it doesn't require much in terms of installation. Just download it and run it (assuming you have `jq`, read more below).
 
 A few things will be needed for shibby to work properly. 
 
@@ -32,11 +31,11 @@ I developed this script on a Mac, but I don't see any reason why it wouldn't run
 ## Setup
 Very first thing you do should be a `resync` or shibby won't work. This is an important step and one that should be done again if you run into snags after using shibby for a while.
 
-```sh ./shibby.sh -r```
+```shibby -r```
 
 Once you have done that, it's time to authenticate shibby. Following the instructions in the Installation section, get the Libby authentication code and run this command:
 
-```sh ./shibby.sh -a 12345678```
+```shibby -a 12345678```
 
 ## Usage/Examples
 To see everything shibby can do, simply pass in `-h` or `--help`
@@ -44,24 +43,48 @@ To see everything shibby can do, simply pass in `-h` or `--help`
 ```shibby -h```
 
 ```
--n shibby [OPTION]...
- Options:
-  -r, --resync                  Start here! Force a new token retrieval (sometimes needed as previously provided tokens can expire)
-  -a, --auth [AUTH CODE]        Login with numeric code generated from Libby app
-  -s, --search [SEARCH STRING]  Searches all your libraries for books that match the search string
-  -c, --checkout                Checkout a book. You will be prompted for the library card id (use the --list command to see these) and the book id (get this from the overdrive website URL)
-  -d [PATH]                     Downloads the audiobook to the location provided as an argument. You will be prompted for the library card and the book id to download.
-  --list                        Shows all your libraries and the respective card Ids
-  --loans                       Shows all the current loans you have at your libraries
-  --debug                       Runs script in BASH debug mode (set -x)
-  -h, --help                    Display this help and exit
-  --version                     Output version information and exit
+Options:
+  -r, --resync
+        Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
+
+  -a, --auth [AUTH CODE]
+        Login with numeric code generated from Libby app
+
+  -s, --search [SEARCH STRING]
+        Searches all your libraries for books that match the search string
+
+  -c, --checkout --lib [libraryId] --book [bookId]
+        Checkout a book. You must also pass in --lib which is the library id (use the --list command to see these) -b | --book which is the book id (get this from the overdrive website URL)
+
+  -d --lib [libraryId] --book [bookId]
+        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id to download from as well as the book id.
+
+  --download=/your/custom/path --lib [libraryId] --book [bookId]
+        Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
+
+  --list
+        Shows all your libraries and the respective card Ids
+
+  --loans
+        Shows all the current loans you have at your libraries
+
+  --holds
+        Shows all the current holds you have at your libraries
+
+  --debug
+        Runs script in BASH debug mode (set -x)
+
+  -h, --help
+        Display this help and exit
+
+  --version
+        Output version information and exit
 ```
 
 ### Viewing your libraries
 Many of the things shibby can do will require a library ID. shibby can show you the IDs that Libby assigns to your libraries. These don't change, but you may to list them out occasionally as you checkout and download various books. Also shown is the unique key assigned to the library by libby. This also doesn't change and will come in handy when determining which libraries have books you want when searching.
 
-```sh ./shibby.sh --list```
+```shibby --list```
 
 You will be given an output that looks like this: 
 
@@ -79,7 +102,7 @@ Salt Lake City Public Library    123456789    slcpl
 
 You can search for books you want with shibby in your terminal prompt. Currently, shibby will only return audiobook results. To do this, simply run a command like the one below:
 
-`sh ./shibby.sh -s "moby dick"`
+`shibby -s "moby dick"`
 
 Once you do that, you will be given some results that look like this: 
 ```
@@ -115,14 +138,14 @@ For example,
 ### Checking out a book
  You can checkout a book through shibby. To do this, run this command
  
- ```sh ./shibby.sh -c```
+ ```shibby -c --lib 123456 -b 654321```
  
- You will then be prompted for the `Card ID` (you get this from the `--list` command) and the `Book Id` (you get this from the overdrive website).
+You must pass in `--lib` which is the library id where you want to check out the book from. You must also pass `-b | --book` which is the book id.
 
 ### Viewing your loans and holds
  Shibby will show you which books you have checked out currently and also which books you have holds for.
 
- `sh ./shibby.sh --loans`
+ `shibby --loans`
 
  ```
 Found 4 books...
@@ -133,7 +156,7 @@ Nasty, Brutish, and Short           Scott Hershovitz  6491010  Books on Tape    
 Finlay Donovan Jumps the Gun        Elle Cosimano     8916746  Macmillan Audio         08:38:50  San Fransico Public Library / 9876543                Tuesday, 21 February 2023
  ```
 
-`sh ./shibby.sh --holds`
+`shibby --holds`
 
  ```
 Found 2 books...
@@ -145,15 +168,15 @@ Mrs. Harris Goes to Paris / Mrs. Har   Paul Gallico    9216126  10:16:14      30
 ### Downloading a book
  Downloading a book is similar to checking one out. The book must first be checked out to you, then run this command: 
 
- ```sh ./shibby.sh -d file/path/where/you/want/it/to/download```
+ ```shibby -d --lib 12345 -b 654321```
 
- NOTE - the filepath in the command is totally optional. It will download to `~/audiobooks` if you don't pass anything in. 
+This will download to `~/audiobooks`. If you'd like to specify where to download the files, use this command: 
 
- After running the command, you'll be prompted for the `Card Id` and the `Book Id`, just like when checking out a book. 
+```shibby --download=file/path/where/you/want/it/to/download --lib 12345 -b 654321```
 
- shibby will then download the book to the location you have chosen. shibby will add `/AUTHOR/BOOK_TITLE` to the path and within the directory with the title's name will be the various mp3 files for the audiobook.
+The `--lib` represents the library you want to download from. The `-b | --book` represents the id of the book you want to download.
 
-
+ shibby will then download the book and will add `/AUTHOR/BOOK_TITLE` to the download path and within the directory will be a subfolder named after the book which will contain the various mp3 files for the audiobook.
 
 ## FAQ
 
@@ -174,17 +197,12 @@ No. The script was built with audiobooks in mind. Using this tool for ebooks is 
 - General refinements as things are admittedly unpolished right now
 - Maybe ebook support
 
-
-
 ## Acknowledgements
 
  - chbrown for the original Overdrive script which inspired me to make this one for Libby. [Check it out here.](https://github.com/chbrown/overdrive)
  - lillius for his version of a Libby app which I attempted to reverse engineer so I could make shibby in bash. [Check it out here.](https://github.com/lullius/pylibby)
  - Nathaniel Landau for his cli boilerplate template which I used. [Check it out here.](https://natelandau.com/boilerplate-shell-script-template/)
 
-
-
 ## Version
 
 ![MIT License](https://img.shields.io/badge/shibby-alpha-green)
-

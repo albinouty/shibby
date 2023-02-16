@@ -44,22 +44,31 @@ To see everything shibby can do, simply pass in `-h` or `--help`
 
 ```
 Options:
-  -r, --resync
+  -r
         Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
 
-  -a, --auth [AUTH CODE]
+  -a [AUTH CODE]
         Login with numeric code generated from Libby app
 
-  -s, --search [SEARCH STRING]
+  -s [SEARCH STRING]
         Searches all your libraries for books that match the search string
 
-  -c, --checkout --lib [libraryId] --book [bookId]
-        Checkout a book. You must also pass in --lib which is the library id (use the --list command to see these) -b | --book which is the book id (get this from the overdrive website URL)
+  -c [-L libraryId -b bookId]
+        Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
-  -d --lib [libraryId] --book [bookId]
-        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id to download from as well as the book id.
+  -H [-L libraryId -b bookId]
+        Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
-  --download=/your/custom/path --lib [libraryId] --book [bookId]
+  -d [-L libraryId -b bookId]
+        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id (-L) to download from as well as the book id (-b).
+
+  -L [LIBRARY ID]
+        Allows you to pass in the library id (retrieved from the --list command). This is required for checking out a book, placing holds, and downloading.
+
+  -b [BOOK ID]
+        Allows you to pass in the book id (which is shown in commands like search, holds, or loans). This is required for checking out a book, placing holds, and downloading.
+
+  --download=/your/custom/path
         Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
 
   --list
@@ -138,9 +147,16 @@ For example,
 ### Checking out a book
  You can checkout a book through shibby. To do this, run this command
  
- ```shibby -c --lib 123456 -b 654321```
+ ```shibby -c -L 123456 -b 654321```
  
-You must pass in `--lib` which is the library id where you want to check out the book from. You must also pass `-b | --book` which is the book id.
+You must pass in `-L` which is the library id where you want to check out the book from. You must also pass `-b` which is the book id.
+
+### Placing a hold
+You can place a hold for a book through shibby. To do this, run this command
+
+```shibby -H -L 123456 -b 654321```
+
+You must pass in `-L` which is the library id where you want to place the hold. You must also pass `-b` which is the book id.
 
 ### Viewing your loans and holds
  Shibby will show you which books you have checked out currently and also which books you have holds for.
@@ -168,13 +184,13 @@ Mrs. Harris Goes to Paris / Mrs. Har   Paul Gallico    9216126  10:16:14      30
 ### Downloading a book
  Downloading a book is similar to checking one out. The book must first be checked out to you, then run this command: 
 
- ```shibby -d --lib 12345 -b 654321```
+ ```shibby -d -L 12345 -b 654321```
 
 This will download to `~/audiobooks`. If you'd like to specify where to download the files, use this command: 
 
-```shibby --download=file/path/where/you/want/it/to/download --lib 12345 -b 654321```
+```shibby --download=file/path/where/you/want/it/to/download -L 12345 -b 654321```
 
-The `--lib` represents the library you want to download from. The `-b | --book` represents the id of the book you want to download.
+The `-L` represents the library you want to download from. The `-b` represents the id of the book you want to download.
 
  shibby will then download the book and will add `/AUTHOR/BOOK_TITLE` to the download path and within the directory will be a subfolder named after the book which will contain the various mp3 files for the audiobook.
 

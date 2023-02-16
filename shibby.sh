@@ -143,7 +143,7 @@ checkout() {
   bookName=$(echo "$bookInfo" | jq -r '.title')
   tokenValue=$(cat "$TOKEN_PATH")
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
-  echo "Checking out $bookName from $libraryName...."
+  echo "Checking out $bookName from $libraryName..."
   loanPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X POST -f -s $SVC_ENDPOINT"/card/$cardId/loan/$bookId")
   expireDate=$(echo "$loanPayload" | jq -r '.expireDate')
   if [ -n "$expireDate" ]; then
@@ -154,6 +154,35 @@ checkout() {
   else
     echo "Something went wrong during checkout. Server responded with the following..."
     echo "$loanPayload"
+  fi
+}
+
+placeHold() {
+  local cardId
+  local bookId
+  cardId=$1
+  bookId=$2
+  getBookInfo "$bookId"
+  getBookInfo "$bookId"
+  bookName=$(echo "$bookInfo" | jq -r '.title')
+  tokenValue=$(cat "$TOKEN_PATH")
+  libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
+  echo "Placing a hold for $bookName at $libraryName..."
+  holdPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X POST -f -s $SVC_ENDPOINT"/card/$cardId/hold/$bookId")
+  holdPosition=$(echo "$holdPayload" | jq -r '.holdListPosition')
+  if [ -n "$holdPosition" ]; then
+    local titleAndAuthor
+    local copies
+    local estWait
+    copies=$(echo "$holdPayload" | jq -r '.ownedCopies')
+    estWait=$(echo "$holdPayload" | jq -r '.estimatedWaitDays')
+    titleAndAuthor=$(echo "$holdPayload" | jq -r '.title + " by " + .firstCreatorName')
+    formatDate $expireDate $OVERDRIVE_DATE_FORMAT
+    echo "Successfully placed a hold for $titleAndAuthor at $libraryName. \n\r \
+    Your hold position is $holdPosition. The library owns $copies copies and your estimated wait is $estWait days."
+  else
+    echo "Something went wrong when trying to place the hold. Server responded with the following..."
+    echo "$holdPayload"
   fi
 }
 
@@ -420,6 +449,7 @@ debug=0
 search=0
 loans=0
 holds=0
+placeHold=0
 
 ########################################
 #######           MAIN           #######
@@ -462,7 +492,7 @@ function mainScript() {
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
       download "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (--lib) and a book id (-b or --book) with this command"
+      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
       usage
       exit
     fi
@@ -473,7 +503,18 @@ function mainScript() {
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
       checkout "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (--lib) and a book id (-b or --book) with this command"
+      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      usage
+      exit
+    fi
+  fi
+
+  # placing a hold for a book
+  if [ $placeHold == 1 ]; then
+    if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      placeHold "$_LIBRARY" "$_BOOK"
+    else
+      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
       usage
       exit
     fi
@@ -520,22 +561,31 @@ function mainScript() {
 ########################################
 usage() {
   echo "Options:
-  -r, --resync
+  -r
         Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
 
-  -a, --auth [AUTH CODE]
+  -a [AUTH CODE]
         Login with numeric code generated from Libby app
 
-  -s, --search [SEARCH STRING]
+  -s [SEARCH STRING]
         Searches all your libraries for books that match the search string
 
-  -c, --checkout --lib [libraryId] --book [bookId]
-        Checkout a book. You must also pass in --lib which is the library id (use the --list command to see these) -b | --book which is the book id (get this from the overdrive website URL)
+  -c [-L libraryId -b bookId]
+        Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
-  -d, --lib [libraryId] --book [bookId]
-        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id to download from as well as the book id.
+  -H [-L libraryId -b bookId]
+        Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
-  --download=/your/custom/path --lib [libraryId] --book [bookId]
+  -d [-L libraryId -b bookId]
+        Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id (-L) to download from as well as the book id (-b).
+
+  -L [LIBRARY ID]
+        Allows you to pass in the library id (retrieved from the --list command). This is required for checking out a book, placing holds, and downloading.
+
+  -b [BOOK ID]
+        Allows you to pass in the book id (which is shown in commands like search, holds, or loans). This is required for checking out a book, placing holds, and downloading.
+
+  --download=/your/custom/path
         Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
 
   --list
@@ -602,14 +652,15 @@ while [[ $1 = -?* ]]; do
   case $1 in
     -h|--help) usage >&2; exit ;;
     --version) echo "$(basename $0) ${version}"; exit ;;
-    -r|--resync) resync=1 ;;
-    -s|--search) shift; searchString=${1}; search=1 ;;
-    -a|--auth) shift; authCode=${1}; auth=1 ;;
-    -c|--checkout) checkoutBook=1 ;;
+    -r) resync=1 ;;
+    -s) shift; searchString=${1}; search=1 ;;
+    -a) shift; authCode=${1}; auth=1 ;;
+    -c) checkoutBook=1 ;;
+    -H) placeHold=1 ;;
     -d) downloadBook=1 ;;
     --download) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
-    --lib) shift; _LIBRARY=${1} ;;
-    -b|--book) shift; _BOOK=${1} ;;
+    -L) shift; _LIBRARY=${1} ;;
+    -b) shift; _BOOK=${1} ;;
     --loans) loans=1 ;;
     --holds) holds=1 ;;
     --list) list=1 ;;

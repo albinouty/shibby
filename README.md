@@ -56,6 +56,9 @@ Options:
   -c [-L libraryId -b bookId]
         Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
+  -R [-L libraryId -b bookId]
+        Return a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
+
   -H [-L libraryId -b bookId]
         Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
@@ -158,6 +161,12 @@ You can place a hold for a book through shibby. To do this, run this command
 
 You must pass in `-L` which is the library id where you want to place the hold. You must also pass `-b` which is the book id.
 
+### Returning a book
+
+```shibby -R -L 123456 -b 654321```
+
+To return a book, you use the `-R` option, along with specifying the library (`-L`) and the book (`-b`).
+
 ### Viewing your loans and holds
  Shibby will show you which books you have checked out currently and also which books you have holds for.
 
@@ -202,21 +211,17 @@ Yep! This script doesn't strip any proprietary DRM from files or do any sort of 
 
 #### Can I get ebooks from this?
 
-No. The script was built with audiobooks in mind. Using this tool for ebooks is in the cards for a future enhancement, though. That being said, today you definitely can checkout any book, regardless of format.
+No. The script was built with audiobooks in mind. Using this tool for ebooks is in the cards for a future enhancement, though.
 
 #### What features are you planning on adding in the future?
 
 - Get more info about a specific book
-- View loans
-- View/place holds
-- Return books
 - General refinements as things are admittedly unpolished right now
-- Maybe ebook support
+- ebook support
 
 ## Acknowledgements
 
  - chbrown for the original Overdrive script which inspired me to make this one for Libby. [Check it out here.](https://github.com/chbrown/overdrive)
- - lillius for his version of a Libby app which I attempted to reverse engineer so I could make shibby in bash. [Check it out here.](https://github.com/lullius/pylibby)
  - Nathaniel Landau for his cli boilerplate template which I used. [Check it out here.](https://natelandau.com/boilerplate-shell-script-template/)
 
 ## Version

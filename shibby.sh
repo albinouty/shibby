@@ -163,7 +163,6 @@ placeHold() {
   cardId=$1
   bookId=$2
   getBookInfo "$bookId"
-  getBookInfo "$bookId"
   bookName=$(echo "$bookInfo" | jq -r '.title')
   tokenValue=$(cat "$TOKEN_PATH")
   libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
@@ -183,6 +182,25 @@ placeHold() {
   else
     echo "Something went wrong when trying to place the hold. Server responded with the following..."
     echo "$holdPayload"
+  fi
+}
+
+returnTheBook() {
+  local cardId
+  local bookId
+  cardId=$1
+  bookId=$2
+  getBookInfo "$bookId"
+  bookName=$(echo "$bookInfo" | jq -r '.title')
+  tokenValue=$(cat "$TOKEN_PATH")
+  libraryName=$(echo "$syncPayload" | jq --arg foo "$cardId" -r '(.cards[] | select(.cardId==$foo)) | .library.name')
+  echo "Returning $bookName to $libraryName..."
+  returnPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X DELETE -f -s $SVC_ENDPOINT"/card/$cardId/loan/$bookId")
+  # check if the return status is 200
+  if [ "$(curl -w '%{http_code}' -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X DELETE -f -s $SVC_ENDPOINT"/card/$cardId/loan/$bookId" -o /dev/null)" = "200" ]; then
+    echo "The book has been returned. Exiting..."
+  else
+    echo "ERROR: Something went wrong when returning the book."
   fi
 }
 
@@ -448,6 +466,7 @@ search=0
 loans=0
 holds=0
 placeHold=0
+returnBook=0
 
 ########################################
 #######           MAIN           #######
@@ -461,6 +480,7 @@ function mainScript() {
     exit
   fi
 
+ # searching for books
   if [ $search == 1 ]; then
     local queryLength=${#searchString}
     if [ -z "$searchString" ] || [ "$queryLength" -lt 2 ]; then
@@ -472,13 +492,13 @@ function mainScript() {
     fi
   fi
 
-  #viewing loans
+  # viewing loans
   if [ $loans == 1 ]; then
    printLoans
    exit
   fi
 
-  #viewing holds
+  # viewing holds
   if [ $holds == 1 ]; then
    printHolds
    exit
@@ -514,6 +534,18 @@ function mainScript() {
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
       checkIfValidCardId "$_LIBRARY"
       placeHold "$_LIBRARY" "$_BOOK"
+    else
+      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      usage
+      exit
+    fi
+  fi
+
+  # returning a book
+  if [ $returnBook == 1 ]; then
+    if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      checkIfValidCardId "$_LIBRARY"
+      returnTheBook "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
       usage
@@ -573,6 +605,9 @@ usage() {
 
   -c [-L libraryId -b bookId]
         Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
+
+  -R [-L libraryId -b bookId]
+        Return a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
 
   -H [-L libraryId -b bookId]
         Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
@@ -659,6 +694,7 @@ while [[ $1 = -?* ]]; do
     -c) checkoutBook=1 ;;
     -H) placeHold=1 ;;
     -d) downloadBook=1 ;;
+    -R) returnBook=1 ;;
     --download) shift; DOWNLOAD_PATH=${1}; downloadBook=1 ;;
     -L) shift; _LIBRARY=${1} ;;
     -b) shift; _BOOK=${1} ;;

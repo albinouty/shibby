@@ -202,8 +202,6 @@ setUpDownloadPath() {
   fi
 }
 
-# PROBLEM - when passing in the download location, everything works.DOWNLOAD_PATH
-# If the download location isn't passed in, everything breaks because the subsequent commands don't work
 download() {
   local cardId
   local bookId
@@ -490,6 +488,7 @@ function mainScript() {
   if [ $downloadBook == 1 ]; then
     setUpDownloadPath
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      checkIfValidCardId "$_LIBRARY"
       download "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
@@ -501,6 +500,7 @@ function mainScript() {
   # checking out a book
   if [ $checkoutBook == 1 ]; then
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      checkIfValidCardId "$_LIBRARY"
       checkout "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
@@ -512,6 +512,7 @@ function mainScript() {
   # placing a hold for a book
   if [ $placeHold == 1 ]; then
     if [ "$_LIBRARY" != "" ] && [ "$_BOOK" != "" ]; then
+      checkIfValidCardId "$_LIBRARY"
       placeHold "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"

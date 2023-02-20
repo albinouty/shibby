@@ -13,7 +13,7 @@ scriptName="shibby"
 scriptPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SVC_ENDPOINT="https://sentry-read.svc.overdrive.com"
 THUNDER_ENDPOINT="https://thunder.api.overdrive.com/v2"
-OVERDRIVE_DATE_FORMAT="%Y-%m-%dT%H:%M:%SZ" #unfortunately not all dates in their APIs conform to this
+OVERDRIVE_DATE_FORMAT="%Y-%m-%dT%H:%M:%SZ" # unfortunately not all dates in their APIs conform to this
 SHIBBY_DATE_FORMAT="+%A, %_d %B %Y" # could add at %r %Z to the end of this to get the time of day. I think it takes up too much console space though
 D_COOKIE=""
 SSCL_COOKIE=""
@@ -33,7 +33,7 @@ _BOOK="" # used to hold the context book id passed in for certain commands
 ########################################
 # These shared utilities provide many functions which are needed to provide
 # the functionality in this script
-#utilsLocation="${scriptPath}/lib/utils.sh" # Update this path to find the utilities.
+# utilsLocation="${scriptPath}/lib/utils.sh" # Update this path to find the utilities.
 
 getToken() {
   local chipPayload
@@ -42,13 +42,12 @@ getToken() {
   getIdentityPayload "$chipPayload"
 }
 
-#TODO: combine common curl arguments into a variable
-#TODO: combine common jq arguments into a variable
+# TODO: combine common curl arguments into a variable
+# TODO: combine common jq arguments into a variable
 
 getSecondToken() {
   local chipPayload
   local tokenValue
-  echo "getting second token"
   # if file is not empty
   if [ -s $TOKEN_PATH ];
   then
@@ -80,17 +79,24 @@ syncWithLibby() {
   local JSON
   local clonePayload
   local tokenValue
+  local cloned
   code=$1
   tokenValue=$(cat "$TOKEN_PATH")
   JSON_TMP='{"code": "%s"}\n'
   JSON=$(printf "$JSON_TMP" "$code")
-  clonePayload=$(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $tokenValue" -d "$JSON" -X POST -f -s $SVC_ENDPOINT"/chip/clone/code" && echo "" || echo "Code sync didn't work")
-  echo "$clonePayload"
+  clonePayload=$(curl -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $tokenValue" -d "$JSON" -X POST -f -s $SVC_ENDPOINT"/chip/clone/code")
+  cloned=$(echo "$clonePayload" | jq -r '.result')
+  if [ $cloned == "cloned" ]; then
+    echo "You are successfully authorized and synced with your Libby app."
+  else
+   echo "Something went wrong. Server responded with"
+   echo "$clonePayload"
+  fi
 }
 
 printLibraries() {
   echo "$syncPayload" | jq -r '"Library:CardId:Libby Key", "---------:---------:---------", (.cards[] | .library.name + ":" + .cardId + ":" + .advantageKey)' | column -s: -t
-  #TODO: find a better way to generate a table with headers
+  # TODO: find a better way to generate a table with headers
 }
 
 libraryIdLookup() {
@@ -331,7 +337,7 @@ printLoans() {
   local allResults="Title_Author_BookId_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
   mkdir -p $TMP_DIR
   getSyncPayload
-  echo "$syncPayload" | jq -r '[.loans[] | select(.type.id=="audiobook")]' > $TMP_LOANS
+  echo "$syncPayload" | jq -r '[.loans[] | select(.type.id=="audiobook" and .isOwned==true)]' > $TMP_LOANS
   getListLength $TMP_LOANS
   x=0
   while [ $x -le $(($listLength - 1 )) ]
@@ -356,7 +362,7 @@ printHolds() {
   local allResults="Title_Author_BookId_Duration_Hold Position_Estimated Wait (Days)_Library / Id_Hold Placed On${formatCharacters}" # these are the headers for the holds
   mkdir -p $TMP_DIR
   getSyncPayload
-  echo "$syncPayload" | jq -r '[.holds[] | select(.type.id=="audiobook")]' > $TMP_HOLDS
+  echo "$syncPayload" | jq -r '[.holds[] | select(.type.id=="audiobook" and .isOwned==true)]' > $TMP_HOLDS
   getListLength $TMP_HOLDS
   x=0
   while [ $x -le $(($listLength - 1 )) ]
@@ -712,9 +718,9 @@ done
 # Store the remaining part as arguments.
 args+=("$@")
 
-############# ############# #############
-##       TIME TO RUN THE SCRIPT        ##
-############# ############# #############
+#######################################
+##       TIME TO RUN THE SCRIPT      ##
+#######################################
 
 # Exit on error. Append '||true' when you run the script if you expect an error.
 set -o errexit

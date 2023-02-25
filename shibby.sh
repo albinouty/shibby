@@ -381,53 +381,20 @@ printHolds() {
   rm -rf $TMP_DIR
 }
 
-searchForBook() {
-  getSyncPayload
-  local advantageKeys
-  local searchUri
-  local libraryParam
-  local TMP_PAYLOAD=$TMP_DIR/searchPayload.txt
-  local TMP_INDV_BOOK=$TMP_DIR/individualBook.txt
-  allResults="Title_Author_BookId_Publisher_Duration_Available Now_Holdable${formatCharacters}" # these are the headers for the results
-  searchString="${searchString// /%20}" # url encodes any spaces
-  libraryParam="&libraryKey="
-  advantageKeys=$(echo "$syncPayload" | jq -r '[.cards[].advantageKey] | join(",")')
-  iter=0
-  # construct query string with library keys  '?libraryKey=KEY_1&libraryKey=KEY_2&query=QUERY_INPUT'
-  for i in ${advantageKeys//,/ }
-  do
-    if [ $iter == 0 ]; then
-      searchUri="?libraryKey=$i"
-    else
-      searchUri="$searchUri""$libraryParam"$i
-    fi
-    ((iter=iter+1))
-  done
-  searchUri="$THUNDER_ENDPOINT"/media/search/"$searchUri"\&query="$searchString"
-  # hit search endpoint with library abbreviations and query string (https://thunder.api.overdrive.com/v2/media/search)
-  mkdir -p $TMP_DIR
-  curl -H "Accept: application/json" -X GET -f -s "$searchUri" | jq -r '[.[] | select(.type.id=="audiobook")]' > $TMP_PAYLOAD
-  # A strange issue was encountered here: running the script through sh is jacking up the json output from the search endpoint. It is breaking the data up into multiple lines.
-  # if you run it through ide, it seems to work fine. Not sure what the difference is
-  # an example of a problematic jq call is here "searchPayload=$(echo "$searchPayload" | jq -r '[.[] | select(.type.id=="audiobook")]')"
-  # LEARNING - For whatever reason, the json isn't split up at all if sh runs jq and it reads the json from a file. So for the complicated payloads like the book searches, I'll just store it in a file and read it from there.
-  getListLength $TMP_PAYLOAD
-  # loop through each result to get specific details
-  x=0
-  while [ $x -le $(($listLength - 1 )) ]
-  do
-    jq --argjson idx "$x" -r '.[$idx]' $TMP_PAYLOAD > $TMP_INDV_BOOK
-    # can't reuse this bookInfo for other similar things (like for loans or holds) because some of fields and properties are slightly different
-    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
+AVAILABLE_LOCATIONS=""
+HOLDABLE_LOCATIONS=""
+# the parameter coming in needs to be the location to a file containing the json for an individual book
+getBookAvailability() {
+  AVAILABLE_LOCATIONS=""
+  HOLDABLE_LOCATIONS=""
+  local TMP_INDV_BOOK=$1
+  local printWaitTime=$2 # when this is true, the hold section will print the wait time in parenthesis
     # get the patron's libraries that have this book as a comma separated list
     availableLibraries=$(jq -r '.siteAvailabilities | keys | join(",")' $TMP_INDV_BOOK)
     # now to get the availability of the various libraries, loop through the csv created earlier
-    local availableLocations=""
-    local holdableLocations=""
     local isAvailable
     local isHoldable
     local id
-    # TODO is this needlessly expensive? Would be lovely not to have to do a subloop. I can't figure out a select statement in the jq to give me what I want though
     for i in ${availableLibraries//,/ }
     do
       # get the unique library id for this library
@@ -437,23 +404,180 @@ searchForBook() {
       isHoldable=$(jq -e -r '.siteAvailabilities.'\"$i\"'.isHoldable|tostring' $TMP_INDV_BOOK)
       # if it does, assign it to the isAvailable var
       if [[ $isAvailable == true ]]; then
-        availableLocations=${availableLocations}"$i:$id "
+        AVAILABLE_LOCATIONS=${AVAILABLE_LOCATIONS}"$i:$id "
       # if not, check if it is holdable, if so assign it to the isHoldable var
       elif [[ $isHoldable == true ]]; then
-        holdableLocations=${holdableLocations}"$i:$id "
+        if [[ $printWaitTime == 1 ]]; then
+          estimatedWait=$(jq -e -r '.siteAvailabilities.'\"$i\"'.estimatedWaitDays' $TMP_INDV_BOOK)
+          HOLDABLE_LOCATIONS=${HOLDABLE_LOCATIONS}"$i:$id ($estimatedWait) | "
+          else
+          HOLDABLE_LOCATIONS=${HOLDABLE_LOCATIONS}"$i:$id "
+        fi
       fi
     done
+      if [[ $AVAILABLE_LOCATIONS == "" ]]; then
+        AVAILABLE_LOCATIONS="<<unavailable>>"
+      fi
+      if [[ $HOLDABLE_LOCATIONS == "" ]]; then
+        HOLDABLE_LOCATIONS="<<check it out instead!>>"
+      elif [[ $printWaitTime == 1 ]]; then
+        HOLDABLE_LOCATIONS="${HOLDABLE_LOCATIONS%???}" # remove last three characters so the final hold entry doesn't have a separator after it
+      fi
+}
+
+constructAndExecuteSearch() {
+    getSyncPayload
+    local tmpPayload=$1
+    searchString="${searchString// /%20}" # url encodes any spaces
+    libraryParam="&libraryKey="
+    advantageKeys=$(echo "$syncPayload" | jq -r '[.cards[].advantageKey] | join(",")')
+    iter=0
+    # construct query string with library keys  '?libraryKey=KEY_1&libraryKey=KEY_2&query=QUERY_INPUT'
+    for i in ${advantageKeys//,/ }
+    do
+        if [ $iter == 0 ]; then
+            searchUri="?libraryKey=$i"
+        else
+            searchUri="$searchUri""$libraryParam"$i
+        fi
+        ((iter=iter+1))
+    done
+    searchUri="$THUNDER_ENDPOINT"/media/search/"$searchUri"\&query="$searchString"
+    # hit search endpoint with library abbreviations and query string (https://thunder.api.overdrive.com/v2/media/search)
+    curl -H "Accept: application/json" -X GET -f -s "$searchUri" | jq -r '[.[] | select(.type.id=="audiobook")]' > $TMP_PAYLOAD
+    # A strange issue was encountered here: running the script through sh is jacking up the json output from the search endpoint. It is breaking the data up into multiple lines.
+    # if you run it through ide, it seems to work fine. Not sure what the difference is
+    # an example of a problematic jq call is here "searchPayload=$(echo "$searchPayload" | jq -r '[.[] | select(.type.id=="audiobook")]')"
+    # LEARNING - For whatever reason, the json isn't split up at all if sh runs jq and it reads the json from a file. So for the complicated payloads like the book searches, I'll just store it in a file and read it from there.
+}
+
+searchForBook() {
+  local advantageKeys
+  local searchUri
+  local libraryParam
+  local TMP_PAYLOAD=$TMP_DIR/searchPayload.txt
+  local TMP_INDV_BOOK=$TMP_DIR/individualBook.txt
+  allResults="Title_Author_BookId_Publisher_Duration_Available Now_Holdable${formatCharacters}" # these are the headers for the results
+  mkdir -p $TMP_DIR
+  constructAndExecuteSearch $TMP_PAYLOAD
+  getListLength $TMP_PAYLOAD
+  # loop through each result to get specific details
+  x=0
+  while [ $x -le $(($listLength - 1 )) ]
+  do
+    jq --argjson idx "$x" -r '.[$idx]' $TMP_PAYLOAD > $TMP_INDV_BOOK
+    # can't reuse this bookInfo for other similar things (like for loans or holds) because some of fields and properties are slightly different
+    bookInfo=$(jq -r '.title + "_" + .firstCreatorName + "_" + .id + "_" + .publisher.name + "_" + (.formats[0].duration // "Not Provided")' $TMP_INDV_BOOK) # grabbing an arbitrary duration. The formats are all similar, with only minutes different duration between them.
+    getBookAvailability $TMP_INDV_BOOK 0
+    allResults="${allResults}""${bookInfo}"_"${AVAILABLE_LOCATIONS}"_"${HOLDABLE_LOCATIONS}""${formatCharacters}"
     x=$(( $x + 1 ))
-      if [[ $availableLocations == "" ]]; then
-        availableLocations="<<unavailable>>"
-      fi
-      if [[ $holdableLocations == "" ]]; then
-        holdableLocations="<<check it out instead!>>"
-      fi
-    allResults="${allResults}""${bookInfo}"_"${availableLocations}"_"${holdableLocations}""${formatCharacters}"
   done
   rm -rf $TMP_DIR
   echo "$allResults" | column -s _ -t
+}
+
+getMoreInfo() {
+  bookId=$1
+  local TMP_INDV_BOOK=$TMP_DIR/individualBook.txt
+  local TMP_PAYLOAD=$TMP_DIR/searchPayload.txt
+  mkdir -p $TMP_DIR
+  local bookName
+  buffer="..........................................."
+  bookInformation=""
+  addInformation() {
+    heading=$1
+    infoToAdd=$2
+    bookInformation=$bookInformation$heading"_"$infoToAdd$formatCharacters
+  }
+  getSyncPayload
+  getBookInfo $bookId
+  # get book info, strip off whatever you can DONE
+  # get the id of the book DONE
+  # run search for book title (set the searchquery variable)
+  # from the payload, get the book where the id equals what we want
+  # run existing logic to get holdable and available locations
+  # look for the book id in the sync payload to say which libraries it is checked out and which it is held at
+  bookName=$(echo "$bookInfo" | jq -r '.title')
+  bookId=$(echo "$bookInfo" | jq -r '.id')
+  echo "Getting more information for the requested book..."
+
+  # get specifics about holds and availability
+  searchString=$bookName
+  constructAndExecuteSearch $TMP_PAYLOAD
+  jq --arg book "$bookId" -r '.[] | select(.id==$book)' $TMP_PAYLOAD > $TMP_INDV_BOOK
+  getBookAvailability $TMP_INDV_BOOK 1
+
+  bookAuthor=$(echo "$bookInfo" | jq -r '.firstCreatorName')
+  publisher=$(echo "$bookInfo" | jq -r '.publisher.name')
+  duration=$(echo "$bookInfo" | jq -r '.formats[0]?.duration // "N/A"')
+  publicDomain=$(echo "$bookInfo" | jq -r '.isPublicDomain')
+  languages=$(echo "$bookInfo" | jq -r '[.languages[]?.name] | join(", ")')
+  maturity=$(echo "$bookInfo" | jq -r '.ratings.maturityLevel.name')
+  awards=$(echo "$bookInfo" | jq -r '[.awards[]?.description] | join(", ") | if . == "" then "none" else . end')
+  subjects=$(echo "$bookInfo" | jq -r '[.subjects[]?.name] | join(", ")')
+  lexile=$(echo "$bookInfo" | jq -r '.levels[]? | select(.id=="lexile") | .value')
+  readingLevel=$(echo "$bookInfo" | jq -r '.levels[]? | select(.id=="reading-level") | .value')
+  format=$(echo "$bookInfo" | jq -r '.type.name')
+  publishDate=$(echo "$bookInfo" | jq -r '.publishDate')
+  formatDate $publishDate $OVERDRIVE_DATE_FORMAT
+  publishDate=$formattedDate" (for this specific format)"
+  series=$(echo "$bookInfo" | jq -r '. | if has("detailedSeries") then .detailedSeries.seriesName else "Not part of a series" end')
+  bookNumber=$(echo "$bookInfo" | jq -r '. | if has("detailedSeries") then .detailedSeries.readingOrder // "N/A" else "N/A" end')
+  narrators=$(echo "$bookInfo" | jq -r '[.creators[]? | select(.role=="Narrator") | .name] | join(", ") | if . == "" then "N/A" else . end')
+  bookDesc=$(echo "$bookInfo" | jq -r '.description' | sed -e 's/<[^>]*>//g') # also strips out the html tags
+
+  # This is ugly, I know. Could use columns or something else, but I want the trailing dots to connect the data and this approach is what I found that gave that to me
+  # I tried an associated array (map), but it's support across bash versions varies and I didn't want to deal with that
+  values=("$bookName" \
+  "$bookAuthor" \
+  "$bookId" \
+  "$format" \
+  "$duration" \
+  "$narrators" \
+  "$publisher" \
+  "$languages" \
+  "$maturity" \
+  "$subjects" \
+  "$awards" \
+  "$publishDate" \
+  "$series" \
+  "$bookNumber" \
+  "$lexile" \
+  "$readingLevel" \
+  "$publicDomain" \
+  "$HOLDABLE_LOCATIONS"\
+  "$AVAILABLE_LOCATIONS" \
+  "$bookDesc")
+
+  # must match the order you put the corresponding values into the "values" array
+  headers="\
+  Title \
+  Author \
+  BookId \
+  Format \
+  Duration \
+  Narrator \
+  Publisher \
+  Language \
+  Maturity \
+  Subjects \
+  Awards \
+  PublishDate \
+  Series \
+  BookNumber \
+  LexileScore \
+  ReadingLevel \
+  InPublicDomain \
+  AvailableToHoldAt \
+  AvailableToCheckoutAt \
+  Description
+  "
+  iter=0
+  for x in $headers; do
+      printf '%.30s %s\n' "$x""$buffer" "${values[$iter]}";
+      ((iter=iter+1));
+  done
+  rm -rf $TMP_DIR
 }
 
 ########################################
@@ -473,6 +597,7 @@ loans=0
 holds=0
 placeHold=0
 returnBook=0
+moreInfo=0
 
 ########################################
 #######           MAIN           #######
@@ -484,6 +609,16 @@ function mainScript() {
   if ! command -v jq &> /dev/null; then
     echo "jq could not be found. Please install jq by following the instructions here https://stedolan.github.io/jq/download/"
     exit
+  fi
+
+  # getting more info about a specific book
+  if [ $moreInfo == 1 ]; then
+    if [ "$_BOOK" != "" ]; then
+      getMoreInfo "$_BOOK"
+    else
+      echo "ERROR: You must pass a book id (-b) with this command"
+      exit
+    fi
   fi
 
  # searching for books
@@ -518,7 +653,6 @@ function mainScript() {
       download "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
-      usage
       exit
     fi
   fi
@@ -530,7 +664,6 @@ function mainScript() {
       checkout "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
-      usage
       exit
     fi
   fi
@@ -542,7 +675,6 @@ function mainScript() {
       placeHold "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
-      usage
       exit
     fi
   fi
@@ -554,7 +686,6 @@ function mainScript() {
       returnTheBook "$_LIBRARY" "$_BOOK"
     else
       echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
-      usage
       exit
     fi
   fi
@@ -601,50 +732,37 @@ function mainScript() {
 usage() {
   echo "Options:
   -r
-        Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
-
+        Start here! Force a new token retrieval. This may be required occasionally as tokens can expire. You must authenticate again after doing this.
   -a [AUTH CODE]
-        Login with numeric code generated from Libby app
-
+        Authenticate shibby with a numeric code generated from the Libby app
   -s [SEARCH STRING]
         Searches all your libraries for books that match the search string
-
+  -i [-b bookId]
+        Retrieves detailed information about the provided book id (-b)
   -c [-L libraryId -b bookId]
         Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -R [-L libraryId -b bookId]
         Return a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -H [-L libraryId -b bookId]
         Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -d [-L libraryId -b bookId]
         Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id (-L) to download from as well as the book id (-b).
-
   -L [LIBRARY ID]
         Allows you to pass in the library id (retrieved from the --list command). This is required for checking out a book, placing holds, and downloading.
-
   -b [BOOK ID]
-        Allows you to pass in the book id (which is shown in commands like search, holds, or loans). This is required for checking out a book, placing holds, and downloading.
-
+        Allows you to pass in the book id (which is shown in commands like search, holds, loans, return, or more-info). This is required for checking out a book, placing holds, and downloading.
   --download=/your/custom/path
         Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
-
   --list
         Shows all your libraries and the respective card Ids
-
   --loans
         Shows all the current loans you have at your libraries
-
   --holds
         Shows all the current holds you have at your libraries
-
   --debug
         Runs script in BASH debug mode (set -x)
-
   -h, --help
         Display this help and exit
-
   --version
         Output version information and exit
 "
@@ -698,6 +816,7 @@ while [[ $1 = -?* ]]; do
     -s) shift; searchString=${1}; search=1 ;;
     -a) shift; authCode=${1}; auth=1 ;;
     -c) checkoutBook=1 ;;
+    -i) moreInfo=1 ;;
     -H) placeHold=1 ;;
     -d) downloadBook=1 ;;
     -R) returnBook=1 ;;

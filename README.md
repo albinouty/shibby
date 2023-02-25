@@ -45,50 +45,37 @@ To see everything shibby can do, simply pass in `-h` or `--help`
 ```
 Options:
   -r
-        Start here! Force a new token retrieval (sometimes you may need to do this again as previously provided tokens can expire)
-
+        Start here! Force a new token retrieval. This may be required occasionally as tokens can expire. You must authenticate again after doing this.
   -a [AUTH CODE]
-        Login with numeric code generated from Libby app
-
+        Authenticate shibby with a numeric code generated from the Libby app
   -s [SEARCH STRING]
         Searches all your libraries for books that match the search string
-
+  -i [-b bookId]
+        Retrieves detailed information about the provided book id (-b)
   -c [-L libraryId -b bookId]
         Checkout a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -R [-L libraryId -b bookId]
         Return a book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -H [-L libraryId -b bookId]
         Place a hold for the book. You must also pass in -L which is the library id (use the --list command to see these) -b which is the book id (get this from the overdrive website URL)
-
   -d [-L libraryId -b bookId]
         Downloads the audiobook to the default location (~/audiobooks). You must pass in the library id (-L) to download from as well as the book id (-b).
-
   -L [LIBRARY ID]
         Allows you to pass in the library id (retrieved from the --list command). This is required for checking out a book, placing holds, and downloading.
-
   -b [BOOK ID]
-        Allows you to pass in the book id (which is shown in commands like search, holds, or loans). This is required for checking out a book, placing holds, and downloading.
-
+        Allows you to pass in the book id (which is shown in commands like search, holds, loans, return, or more-info). This is required for checking out a book, placing holds, and downloading.
   --download=/your/custom/path
         Downloads the audiobook to the location provided. You must pass in the library id to download from as well as the book id.
-
   --list
         Shows all your libraries and the respective card Ids
-
   --loans
         Shows all the current loans you have at your libraries
-
   --holds
         Shows all the current holds you have at your libraries
-
   --debug
         Runs script in BASH debug mode (set -x)
-
   -h, --help
         Display this help and exit
-
   --version
         Output version information and exit
 ```
@@ -146,6 +133,19 @@ For example,
 - if the url is `ww.libraryname.overdrive.com/media/27324`
   - the book ID in this case is `27324`
  You will need the book ID to checkout or download. 
+
+### Get more information about a book
+If you want to get extra details about a specific book, run this command: 
+
+```shibby -i -b 654321```
+
+the `-b` is the book id. This will show you information the search will show you, such as title and author and where you can check it out and place a hold. It will also tell you extra things like the subjects, reading level, awards, description. 
+
+It also has a nice bit of information added on to the holds that looks like this: 
+
+```AvailableToHoldAt............. aclibrary:1234 (13) | fortvancouver:6788 (18) | slco:3425 (15)```
+
+The number in parenthesis is the estimated wait time for your hold to become available. 
 
 ### Checking out a book
  You can checkout a book through shibby. To do this, run this command
@@ -215,7 +215,6 @@ No. The script was built with audiobooks in mind. Using this tool for ebooks is 
 
 #### What features are you planning on adding in the future?
 
-- Get more info about a specific book
 - General refinements as things are admittedly unpolished right now
 - ebook support
 

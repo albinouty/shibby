@@ -3,21 +3,26 @@
 shibby is a shell script for Libby (get it? sh-ibby...you get it). With the move to Libby, the mp3 files for audiobooks are no longer easily accessible like they once were directly through Overdrive. This tool gives you access to those files again...
 
 ## Installation
-Because shibby is a bash script, it doesn't require much in terms of installation. Just download it and run it (assuming you have `jq`, read more below).
+Because shibby is a bash script, it doesn't require much in terms of installation. Just download it and run it (the few requirements it does have are listed in the `Requirements` section).
 
 Just a note: this script is supposed to be run with `bash`, nothing else. The file is executable so you should run it in a way where the first line of the script (the shebang) is used. Don't explicitly use `sh` or anything else during execution. The shebang tells the program loader which interpreter to use when running the file.
 
 ## Requirements
 shibby has some requirements in order to work properly.
+
+#### The Libby app
+Whatever your opinion of Libby is, the fact of the matter is that the powers that be are going all in on Libby. Overdrive has been hinting about the eventual [discontinuation of the Overdrive app](https://company.overdrive.com/2022/06/15/go-all-in-on-libby/) (in favor of Libby) for a while, always slated as sometime in early 2023.
+
+###### Update: In a recent post, Overdrive has [set a date](https://company.overdrive.com/2023/01/25/public-libraries-lend-one-billion-titles-with-the-libby-reading-app/) of April 2023 for the discontinuation of the Overdrive app, and I assume access to the `odm` files. Shibby will continue to work after the discontinuation of Overdrive. 
+
+In order for shibby to work, you need to have the Libby app and your card(s) added to it.
+[Get it here.](https://www.overdrive.com/apps/libby#GetTheApp)
+
 #### jq
 I tried to write this in a way where it requires minimal dependencies. That being said, you will need `jq` installed for this script to work. You can install it [here](https://stedolan.github.io/jq/).
 
 #### A valid library card
-Talk to your library about getting a card. Many offer the ability to have an electric card only. As long as you can log in to the library's Overdrive site, you will be fine.
-
-#### The Libby app
-Whatever your opinion of Libby is, the fact of the matter is that the powers that be are going all in on Libby. In order for shibby to work, you will also need to have the Libby app, and your card(s) added to it. 
-[Get it here.](https://www.overdrive.com/apps/libby#GetTheApp)
+Talk to your library about getting a card. Many offer the ability to have an e-card only. As long as you can log in to the library's Overdrive site, you will be fine.
 
 #### Libby authentication code
 After you have logged in to the Libby app and added your card(s), you will need to authenticate shibby to access your account to checkout and download books. 

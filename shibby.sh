@@ -124,7 +124,8 @@ getSyncPayload() {
     tokenValue=$(cat "$TOKEN_PATH")
     syncPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -X GET -f -s $SVC_ENDPOINT"/chip/sync")
   else
-    echo "Missing token, be sure to resync and authenticate with a libby code"
+    echo "Missing token, be sure to resync and authenticate with a Libby code"
+    exit
   fi
 }
 
@@ -523,8 +524,8 @@ getMoreInfo() {
   maturity=$(echo "$bookInfo" | jq -r '.ratings.maturityLevel.name')
   awards=$(echo "$bookInfo" | jq -r '[.awards[]?.description] | join(", ") | if . == "" then "none" else . end')
   subjects=$(echo "$bookInfo" | jq -r '[.subjects[]?.name] | join(", ")')
-  lexile=$(echo "$bookInfo" | jq -r '.levels[]? | select(.id=="lexile") | .value')
-  readingLevel=$(echo "$bookInfo" | jq -r '.levels[]? | select(.id=="reading-level") | .value')
+  lexile=$(echo "$bookInfo" | jq -r '(select(.levels | length > 0) | .levels[]? | select(.id=="lexile") | .value) // "Not provided"')
+  readingLevel=$(echo "$bookInfo" | jq -r '(select(.levels | length > 0) | .levels[]? | select(.id=="reading-level") | .value) // "Not provided"')
   format=$(echo "$bookInfo" | jq -r '.type.name')
   publishDate=$(echo "$bookInfo" | jq -r '.publishDate')
   formatDate $publishDate $OVERDRIVE_DATE_FORMAT
@@ -612,12 +613,24 @@ moreInfo=0
 ########################################
 function mainScript() {
   rm -rf $TMP_DIR
-  # TODO: add if statement for the checkout path
-  getSyncPayload
   if ! command -v jq &> /dev/null; then
     echo "jq could not be found. Please install jq by following the instructions here https://stedolan.github.io/jq/download/"
     exit
   fi
+  # if the token file is empty, request a new token
+  if [ ! -s $TOKEN_PATH ]; then
+    echo "WARNING: no token found, requesting one and writing it to the token.id file"
+    getToken
+    # if the token file is still empty, exit or prompt user to now authenticate
+    if [ ! -s $TOKEN_PATH ]; then
+      echo "ERROR Unable to request a new token at this time."
+      exit
+    else
+      echo "Successfully retrieved a new token. ***This must now be authenticated with the -a option and a code from Libby before you can continue.***"
+      exit
+    fi
+  fi
+  getSyncPayload
 
   # getting more info about a specific book
   if [ $moreInfo == 1 ]; then
@@ -709,13 +722,10 @@ function mainScript() {
   if [ $resync == 1 ]; then
     echo "resyncing...requesting a new token and writing it to the token.id file"
     getToken
+    if [ -s $TOKEN_PATH ]; then
+      echo "Successfully retrieved a new token. ***This must now be authenticated with the -a option and a code from Libby before you can continue.***"
+    fi
     exit
-  fi
-
-  # if the token file is empty, request a new token
-  if [ ! -s $TOKEN_PATH ]; then
-    echo "no token found, requesting one and writing it to the token.id file"
-    getToken
   fi
 
   # if authorizing, we want to simply sync with the provided code, update our bearer token, and then exit as nothing else is needed.

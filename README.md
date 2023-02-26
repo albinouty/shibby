@@ -31,7 +31,13 @@ Libraries all have their own Overdrive website where you can checkout ebooks and
 I developed this script on a Mac, and I regularly verify that it is working as expected on a Linux distro (Ubuntu). I wouldn't even be surprised if this could run on Windows, provided you have the proper tools in place there to run bash scripts.
 
 ## Setup
-Very first thing you do should be a `resync` or shibby won't work. This is an important step and one that should be done again if you run into snags after using shibby for a while.
+Very first thing you do should be a `resync` or shibby won't work. This will also happen automatically if shibby notices you don't have a token yet. You will see something like this in that case: 
+
+```
+WARNING: no token found, requesting one and writing it to the token.id file
+Successfully retrieved a new token. ***This must now be authenticated with the -a option and a code from Libby before you can continue.***
+```
+You can manually do this with the `-r` option (and you may need to do this occasionally as tokens can expire). This is an important step and one that should be done again if you run into snags after using shibby for a while.
 
 ```shibby -r```
 

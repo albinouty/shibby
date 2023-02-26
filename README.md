@@ -5,8 +5,10 @@ shibby is a shell script for Libby (get it? sh-ibby...you get it). With the move
 ## Installation
 Because shibby is a bash script, it doesn't require much in terms of installation. Just download it and run it (assuming you have `jq`, read more below).
 
-A few things will be needed for shibby to work properly. 
+Just a note: this script is supposed to be run with `bash`, nothing else. The file is executable so you should run it in a way where the first line of the script (the shebang) is used. Don't explicitly use `sh` or anything else during execution. The shebang tells the program loader which interpreter to use when running the file.
 
+## Requirements
+shibby has some requirements in order to work properly.
 #### jq
 I tried to write this in a way where it requires minimal dependencies. That being said, you will need `jq` installed for this script to work. You can install it [here](https://stedolan.github.io/jq/).
 
@@ -26,7 +28,7 @@ Within the Libby app find the `Settings` location. Within that area, there will 
 Libraries all have their own Overdrive website where you can checkout ebooks and audiobooks with your library card. Check with your library to get the link to their overdrive site. 
 
 #### A way to run a shell script 
-I developed this script on a Mac, but I don't see any reason why it wouldn't run on Linux (I haven't tried it, though). I wouldn't even be surprised if this could run on Windows, provided you have the proper tools in place there to run bash scripts.
+I developed this script on a Mac, and I regularly verify that it is working as expected on a Linux distro (Ubuntu). I wouldn't even be surprised if this could run on Windows, provided you have the proper tools in place there to run bash scripts.
 
 ## Setup
 Very first thing you do should be a `resync` or shibby won't work. This is an important step and one that should be done again if you run into snags after using shibby for a while.
@@ -145,7 +147,7 @@ It also has a nice bit of information added on to the holds that looks like this
 
 ```AvailableToHoldAt............. aclibrary:1234 (13) | fortvancouver:6788 (18) | slco:3425 (15)```
 
-The number in parenthesis is the estimated wait time for your hold to become available. 
+The number in parenthesis is the estimated wait time (in days) for your hold to become available. 
 
 ### Checking out a book
  You can checkout a book through shibby. To do this, run this command
@@ -215,14 +217,14 @@ No. The script was built with audiobooks in mind. Using this tool for ebooks is 
 
 #### What features are you planning on adding in the future?
 
-- General refinements as things are admittedly unpolished right now
-- ebook support
+- Ebook support
+- Take a look at the issues section for other small and major enhancements
 
 ## Acknowledgements
 
  - chbrown for the original Overdrive script which inspired me to make this one for Libby. [Check it out here.](https://github.com/chbrown/overdrive)
- - Nathaniel Landau for his cli boilerplate template which I used. [Check it out here.](https://natelandau.com/boilerplate-shell-script-template/)
+ - Nathaniel Landau for his cli boilerplate template which I used and heavily modified. [Check it out here.](https://natelandau.com/boilerplate-shell-script-template/)
 
 ## Version
 
-![MIT License](https://img.shields.io/badge/shibby-alpha-green)
+![MIT License](https://img.shields.io/badge/shibby-v1.0.0-green)

@@ -27,6 +27,7 @@ formatCharacters="\r\n" # carriage return plus new line. Can use "echo -e" if th
 formattedDate=""
 _LIBRARY="" # used to hold the context library passed in for certain commands
 _BOOK="" # used to hold the context book id passed in for certain commands
+libraryAndBookRequiredError="ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
 
 ########################################
 #######           UTIL           #######
@@ -325,16 +326,19 @@ download() {
 }
 
 getListLength() {
-  local path
-  path=$1
-  listLength=$(jq -r 'length' $path)
-  echo "Found $listLength books..."
+    local path
+    path=$1
+    listLength=$(jq -r 'length' $path)
+    echo "Found $listLength books..."
+    if [[ $listLength == 0 ]]; then
+        exit
+    fi
 }
 
 printLoans() {
   local TMP_LOANS=$TMP_DIR/loans.txt
   local TMP_INDV_LOAN=$TMP_DIR/individualLoan.txt
-  local allResults="Title_Author_BookId_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
+  allResults="Title_Author_BookId_Duration_Library / Id_Due Date${formatCharacters}" # these are the headers for the loans
   mkdir -p $TMP_DIR
   getSyncPayload
   echo "$syncPayload" | jq -r '[.loans[] | select(.type.id=="audiobook" and .isOwned==true)]' > $TMP_LOANS
@@ -352,14 +356,14 @@ printLoans() {
     x=$(( $x + 1 ))
     allResults="${allResults}""${bookInfo}"_"${libraryName}"_"${formattedDate}""${formatCharacters}"
   done
-  echo "$allResults" | column -s _ -t
+  printResults
   rm -rf $TMP_DIR
 }
 
 printHolds() {
   local TMP_HOLDS=$TMP_DIR/holds.txt
   local TMP_INDV_HOLD=$TMP_DIR/individualhold.txt
-  local allResults="Title_Author_BookId_Duration_Hold Position_Estimated Wait (Days)_Library / Id_Hold Placed On${formatCharacters}" # these are the headers for the holds
+  allResults="Title_Author_BookId_Duration_Hold Position_Estimated Wait (Days)_Library / Id_Hold Placed On${formatCharacters}" # these are the headers for the holds
   mkdir -p $TMP_DIR
   getSyncPayload
   echo "$syncPayload" | jq -r '[.holds[] | select(.type.id=="audiobook" and .isOwned==true)]' > $TMP_HOLDS
@@ -377,7 +381,7 @@ printHolds() {
     x=$(( $x + 1 ))
     allResults="${allResults}""${bookInfo}"_"${libraryName}"_"${formattedDate}""${formatCharacters}"
   done
-  echo "$allResults" | column -s _ -t
+  printResults
   rm -rf $TMP_DIR
 }
 
@@ -451,6 +455,10 @@ constructAndExecuteSearch() {
     # LEARNING - For whatever reason, the json isn't split up at all if sh runs jq and it reads the json from a file. So for the complicated payloads like the book searches, I'll just store it in a file and read it from there.
 }
 
+printResults() {
+    echo -e "$allResults" | column -s _ -t
+}
+
 searchForBook() {
   local advantageKeys
   local searchUri
@@ -473,7 +481,7 @@ searchForBook() {
     x=$(( $x + 1 ))
   done
   rm -rf $TMP_DIR
-  echo "$allResults" | column -s _ -t
+  printResults
 }
 
 getMoreInfo() {
@@ -652,7 +660,7 @@ function mainScript() {
       checkIfValidCardId "$_LIBRARY"
       download "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      echo "$libraryAndBookRequiredError"
       exit
     fi
   fi
@@ -663,7 +671,7 @@ function mainScript() {
       checkIfValidCardId "$_LIBRARY"
       checkout "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      echo "$libraryAndBookRequiredError"
       exit
     fi
   fi
@@ -674,7 +682,7 @@ function mainScript() {
       checkIfValidCardId "$_LIBRARY"
       placeHold "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      echo "$libraryAndBookRequiredError"
       exit
     fi
   fi
@@ -685,7 +693,7 @@ function mainScript() {
       checkIfValidCardId "$_LIBRARY"
       returnTheBook "$_LIBRARY" "$_BOOK"
     else
-      echo "ERROR: You must pass in both a library (-L) and a book id (-b) with this command"
+      echo "$libraryAndBookRequiredError"
       exit
     fi
   fi

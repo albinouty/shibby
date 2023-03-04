@@ -27,7 +27,7 @@ Talk to your library about getting a card. Many offer the ability to have an e-c
 #### Libby authentication code
 After you have logged in to the Libby app and added your card(s), you will need to authenticate shibby to access your account to checkout and download books. 
 
-Within the Libby app find the `Settings` location. Within that area, there will be an option called `Copy To Another Device`. This code will need to be passed in to shibby to properly authenticate the script. See the Usage section for how to do that. 
+Within the Libby app find the `Settings` location. Within that area, there will be an option called `Copy To Another Device`. This code will need to be passed in to shibby to properly authenticate the script. See the `Setup` section for how to do that. 
 
 #### Overdrive website
 Libraries all have their own Overdrive website where you can checkout ebooks and audiobooks with your library card. Check with your library to get the link to their overdrive site. 

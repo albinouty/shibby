@@ -185,7 +185,7 @@ placeHold() {
     estWait=$(echo "$holdPayload" | jq -r '.estimatedWaitDays')
     titleAndAuthor=$(echo "$holdPayload" | jq -r '.title + " by " + .firstCreatorName')
     formatDate $expireDate $OVERDRIVE_DATE_FORMAT
-    echo "Successfully placed a hold for $titleAndAuthor at $libraryName. \n\r \
+    echo -e "Successfully placed a hold for $titleAndAuthor at $libraryName. \n\r \
     Your hold position is $holdPosition. The library owns $copies copies and your estimated wait is $estWait days."
   else
     echo "Something went wrong when trying to place the hold. Server responded with the following..."
@@ -289,14 +289,13 @@ download() {
   # PROPER FORMAT FOR THE HEADER IS "Cookie: _sscl_d=COOKIE_VALUE; d=COOKIE_VALUE"
   openbookPayload=$(curl -H "Accept: application/json" -H "Authorization: Bearer $tokenValue" -H "Cookie: _sscl_d=$SSCL_COOKIE; d=$D_COOKIE" -X GET -f -s "$openbookUrl" )
 
-  # get the author and book name without spaces to use in the directory path to the mp3 files
-  bookNameNoSpaces=$(echo "$bookName" | tr -d ' ')
-  authorNameNoSpaces=$(echo "$authorName" | tr -d ' ')
+  bookNameWithSpaces=$(echo "$bookName")
+  authorNameWithSpaces=$(echo "$authorName")
 
   presentDirectory=$(pwd)
   cd "$DOWNLOAD_PATH"
-  mkdir -p ./"$authorNameNoSpaces"/"$bookNameNoSpaces"
-  cd "$authorNameNoSpaces"/"$bookNameNoSpaces"
+  mkdir -p ./"$authorNameWithSpaces"/"$bookNameWithSpaces"
+  cd "$authorNameWithSpaces"/"$bookNameWithSpaces"
   echo "Downloading cover"
   coverLocation=$(echo "$bookInfo" | jq -r '.covers.cover510Wide.href' | sed -e "s/{/%7B/" -e "s/}/%7D/")
   curl -o "cover.jpg" -f -s "$coverLocation"
@@ -314,7 +313,7 @@ download() {
   # To get the files, query the web url followed by the path value (the line value in this case)
   # -o downloads the file and gives it a local name we provide
   # -L follows the redirect to odrmediaclips.cachefly.net
-  curl -o "part$iter.mp3" -L -f -s -H "Accept: */*" -H "Authorization: Bearer $tokenValue" -H "Cookie: _sscl_d=$SSCL_COOKIE; d=$D_COOKIE" -X GET "$webUrl"/"$line"
+  curl -o "$bookNameWithSpaces - Part $iter.mp3" -L -f -s -H "Accept: */*" -H "Authorization: Bearer $tokenValue" -H "Cookie: _sscl_d=$SSCL_COOKIE; d=$D_COOKIE" -X GET "$webUrl"/"$line"
   done < "$tmpPath"
 
   # delete the tmp file
@@ -720,6 +719,10 @@ function mainScript() {
   # if resync flag is passed, we need to get a token and then exit.
   # other housekeeping/setup stuff can go here
   if [ $resync == 1 ]; then
+    if [ "$_LIBRARY" != "" ] || [ "$_BOOK" != "" ]; then
+        echo "Resyncing requires only the -r flag to be passed. Did you mean to return a book with -R instead? Exiting..."
+        exit
+    fi
     echo "resyncing...requesting a new token and writing it to the token.id file"
     getToken
     if [ -s $TOKEN_PATH ]; then

@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> This tool is now defunct. Libby authentication has now been restricted to official Libby applications on approved devices. So that's curtains for this script. Thanks for the interest and good luck!
+
 # shibby
 
 shibby is a shell script for Libby (get it? sh-ibby...you get it). With the move to Libby, the mp3 files for audiobooks are no longer easily accessible like they once were directly through Overdrive. This tool gives you access to those files again...
